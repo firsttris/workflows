@@ -100,5 +100,6 @@ jobs:
 
 ## Versions
 
-Callers pin `@v1`. Compatible changes move the `v1` tag; a breaking change (renamed inputs, other
-defaults) becomes `v2`.
+Callers pin `@v1`. After a compatible change, run *Move major tag* (Actions → Run workflow on
+`main`), which points `v1` at the current `main`. A breaking change (renamed inputs, other defaults)
+gets a new major tag, `v2`, instead.

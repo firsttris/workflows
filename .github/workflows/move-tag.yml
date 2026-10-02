@@ -1,0 +1,32 @@
+name: Move major tag
+
+# Points a major tag (default v1) at the current main. Run it after a compatible change, so every
+# caller pinned to @v1 gets it; a breaking change gets a new major tag instead.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Major tag to move
+        type: string
+        default: v1
+
+permissions:
+  contents: write
+
+jobs:
+  move:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Move ${{ inputs.tag }} to ${{ github.sha }}
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          if ! [[ "$TAG" =~ ^v[0-9]+$ ]]; then
+            echo "::error::Expected a major tag like v1, got $TAG"
+            exit 1
+          fi
+          git tag -f "$TAG"
+          git push -f origin "refs/tags/$TAG"
+          echo "$TAG → $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
