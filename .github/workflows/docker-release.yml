@@ -157,6 +157,7 @@ jobs:
           text = open(os.environ["README"], encoding="utf-8").read()
           text = re.sub(r"(!\[[^\]]*\]\()([^)\s]+)", lambda m: m[1] + fix(m[2], raw), text)
           text = re.sub(r"((?:src|srcset)=\")([^\"]+)", lambda m: m[1] + fix(m[2], raw), text)
+          text = re.sub(r"(href=\")([^\"]+)", lambda m: m[1] + fix(m[2], blob), text)
           text = re.sub(r"(\]\()([^)\s]+)", lambda m: m[1] + fix(m[2], blob), text)
           open("dockerhub-readme.md", "w", encoding="utf-8").write(text)
       - name: Update Docker Hub description
