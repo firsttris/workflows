@@ -8,6 +8,11 @@ Shared GitHub Actions workflows for my projects.
 image, pushes it to Docker Hub (and optionally GHCR), updates the Docker Hub description from the
 README and creates the GitHub release. Each project keeps its own CI and calls this after it.
 
+Each platform builds in its own job: `amd64` on a normal runner, `arm64` on GitHub's native ARM
+runner (free for public repositories, far faster than emulation, which matters for Rust). A merge job
+joins them into one multi-arch tag, so `docker pull` picks the right one on a PC, a NAS or a
+Raspberry Pi.
+
 | Run | Image tags | GitHub release |
 |---|---|---|
 | tag `vX.Y.Z` pushed | `x.y.z`, `x.y`, `latest` | yes, with generated notes, after the image is out |
@@ -63,7 +68,8 @@ with the scripts below in `package.json`):
 | `description` | `""` | Docker Hub short description (max. 100 characters); empty keeps the current one |
 | `dockerfile` | `docker/Dockerfile` | |
 | `context` | `.` | |
-| `platforms` | `linux/amd64,linux/arm64` | |
+| `platforms` | `linux/amd64,linux/arm64` | comma-separated; anything but amd64 and arm64 (e.g. `linux/arm/v7`) builds under QEMU |
+| `native-runners` | `true` | build `arm64` on the ARM runner; `false` builds it under QEMU (private repositories without ARM runners) |
 | `ghcr` | `false` | also push `ghcr.io/<owner>/<repo>` |
 | `version-file` | `package.json` | `package.json` or `Cargo.toml` that must match the tag; `""` skips the check |
 | `readme` | `README.md` | README for Docker Hub, relative links and images made absolute; `""` skips it |
@@ -76,14 +82,16 @@ Output: `version`, the published `x.y.z` (empty for `edge`).
 ### Examples
 
 **Rust project** (haul): the version comes from `Cargo.toml`, the browser extension is attached
-to the release.
+to the release, `arm64` compiles on the native ARM runner.
 
 ```yaml
 jobs:
+  checks:
+    uses: ./.github/workflows/ci.yml
   extension:
     uses: ./.github/workflows/extension.yml   # uploads the artifact "haul-extension"
   docker:
-    needs: extension
+    needs: [checks, extension]
     uses: firsttris/workflows/.github/workflows/docker-release.yml@v1
     with:
       image: tristanteu/haul

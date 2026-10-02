@@ -1,9 +1,13 @@
 name: Docker release
 
-# Reusable: builds and pushes a multi-arch image, updates the Docker Hub description and, for a
+# Reusable: builds a multi-arch image, pushes it, updates the Docker Hub description and, for a
 # version tag, creates the GitHub release. The caller decides when it runs (tag push, by hand) and
 # runs its own CI first. On a tag vX.Y.Z: :x.y.z, :x.y, :latest, then the GitHub release. Anywhere
 # else (e.g. run by hand on the default branch): :edge, no release.
+#
+# Every platform builds in its own job, arm64 on GitHub's native ARM runner (free for public
+# repositories, much faster than QEMU, which matters for compiled languages like Rust). A merge job
+# then joins the per-platform images into one multi-arch tag.
 on:
   workflow_call:
     inputs:
@@ -22,8 +26,13 @@ on:
         type: string
         default: .
       platforms:
+        description: Comma-separated, e.g. linux/amd64,linux/arm64,linux/arm/v7
         type: string
         default: linux/amd64,linux/arm64
+      native-runners:
+        description: Build arm64 on GitHub's ARM runner instead of QEMU; set false where those runners are not available (private repositories without them)
+        type: boolean
+        default: true
       ghcr:
         description: Also push to ghcr.io/<owner>/<repo>
         type: boolean
@@ -50,16 +59,15 @@ on:
     outputs:
       version:
         description: The published version (x.y.z), empty for edge
-        value: ${{ jobs.image.outputs.version }}
+        value: ${{ jobs.prepare.outputs.version }}
 
 jobs:
-  image:
+  prepare:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
     outputs:
       version: ${{ steps.version.outputs.version }}
+      matrix: ${{ steps.plan.outputs.matrix }}
+      names: ${{ steps.plan.outputs.names }}
     steps:
       - uses: actions/checkout@v4
 
@@ -89,20 +97,48 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "Publishing $version" >> "$GITHUB_STEP_SUMMARY"
 
-      - id: images
-        name: Image names
+      - id: plan
+        name: Platforms and image names
         env:
+          PLATFORMS: ${{ inputs.platforms }}
+          NATIVE: ${{ inputs.native-runners }}
           IMAGE: ${{ inputs.image }}
           GHCR: ${{ inputs.ghcr }}
+        shell: python
         run: |
-          {
-            echo "list<<EOF"
-            echo "$IMAGE"
-            if [[ "$GHCR" == "true" ]]; then echo "ghcr.io/${GITHUB_REPOSITORY,,}"; fi
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
+          import json, os
+          native = os.environ["NATIVE"] == "true"
+          matrix = []
+          for platform in [p.strip() for p in os.environ["PLATFORMS"].split(",") if p.strip()]:
+              arm64 = platform == "linux/arm64"
+              matrix.append({
+                  "platform": platform,
+                  "pair": platform.replace("/", "-"),
+                  # arm64 runs natively on the ARM runner, amd64 natively anyway, the rest under QEMU
+                  "runner": "ubuntu-24.04-arm" if arm64 and native else "ubuntu-latest",
+                  "qemu": platform != "linux/amd64" and not (arm64 and native),
+              })
+          names = [os.environ["IMAGE"]]
+          if os.environ["GHCR"] == "true":
+              names.append("ghcr.io/" + os.environ["GITHUB_REPOSITORY"].lower())
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              out.write(f"matrix={json.dumps({'include': matrix})}\n")
+              out.write(f"names={','.join(names)}\n")
 
-      - uses: docker/setup-qemu-action@v3
+  build:
+    name: Build ${{ matrix.platform }}
+    needs: prepare
+    strategy:
+      fail-fast: true
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - if: matrix.qemu
+        uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
@@ -116,28 +152,86 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
       - id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ steps.images.outputs.list }}
-          tags: |
-            type=semver,pattern={{version}},value=${{ steps.version.outputs.version }},enable=${{ steps.version.outputs.version != '' }}
-            type=semver,pattern={{major}}.{{minor}},value=${{ steps.version.outputs.version }},enable=${{ steps.version.outputs.version != '' }}
-            type=raw,value=latest,enable=${{ steps.version.outputs.version != '' }}
-            type=raw,value=edge,enable=${{ steps.version.outputs.version == '' }}
+          images: ${{ needs.prepare.outputs.names }}
 
-      - uses: docker/build-push-action@v6
+      # Pushed by digest only; the merge job puts the tags on the multi-arch list.
+      - id: build
+        uses: docker/build-push-action@v6
         with:
           context: ${{ inputs.context }}
           file: ${{ inputs.dockerfile }}
-          platforms: ${{ inputs.platforms }}
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          outputs: type=image,"name=${{ needs.prepare.outputs.names }}",push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=${{ matrix.pair }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.pair }}
+      - name: Export digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/digests"
+          touch "$RUNNER_TEMP/digests/${DIGEST#sha256:}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: docker-digest-${{ matrix.pair }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
 
+  merge:
+    name: Publish multi-arch image
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: docker-digest-*
+          merge-multiple: true
+      - uses: docker/setup-buildx-action@v3
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ inputs.dockerhub-user }}
+          password: ${{ secrets.DOCKER_PAT }}
+      - name: Log in to GHCR
+        if: inputs.ghcr
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ needs.prepare.outputs.names }}
+          tags: |
+            type=semver,pattern={{version}},value=${{ needs.prepare.outputs.version }},enable=${{ needs.prepare.outputs.version != '' }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.prepare.outputs.version }},enable=${{ needs.prepare.outputs.version != '' }}
+            type=raw,value=latest,enable=${{ needs.prepare.outputs.version != '' }}
+            type=raw,value=edge,enable=${{ needs.prepare.outputs.version == '' }}
+      - name: Create the multi-arch tags
+        working-directory: ${{ runner.temp }}/digests
+        env:
+          IMAGE: ${{ inputs.image }}
+        run: |
+          # shellcheck disable=SC2046,SC2059 # one -t per tag, one source per digest
+          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf "$IMAGE@sha256:%s " *)
+      - name: Inspect
+        env:
+          IMAGE: ${{ inputs.image }}
+          TAG: ${{ steps.meta.outputs.version }}
+        run: docker buildx imagetools inspect "$IMAGE:$TAG"
+
+      - uses: actions/checkout@v4
+        if: inputs.readme != ''
       - name: README for Docker Hub
         if: inputs.readme != ''
         env:
@@ -171,8 +265,8 @@ jobs:
           readme-filepath: ./dockerhub-readme.md
 
   github-release:
-    needs: image
-    if: needs.image.outputs.version != ''
+    needs: [prepare, merge]
+    if: needs.prepare.outputs.version != ''
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -187,7 +281,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           IMAGE: ${{ inputs.image }}
-          VERSION: ${{ needs.image.outputs.version }}
+          VERSION: ${{ needs.prepare.outputs.version }}
         run: |
           set -euo pipefail
           files=()
