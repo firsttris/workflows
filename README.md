@@ -156,13 +156,17 @@ jobs:
 | Input | Default | |
 |---|---|---|
 | `bump` | `patch` | `patch`, `minor` or `major`; `patch` on `1.2.0-rc.1` gives `1.2.0` |
-| `version-file` | `package.json` | `package.json`, `Cargo.toml` (also `[workspace.package]`) or a Kodi `addon.xml` |
+| `version-file` | `package.json` | `package.json`, `Cargo.toml` (also `[workspace.package]`) or a Kodi `addon.xml`; `""`: the tag alone is the version (see below) |
 | `extra-files` | `""` | further files with the same version, one per line, e.g. `src-tauri/tauri.conf.json` |
 | `tag-prefix` | `v` | |
 | `release-workflow` | `release.yml` | started on the new tag; `""` starts nothing |
 
 A `package-lock.json` next to a `package.json` and a `Cargo.lock` next to a `Cargo.toml` (the
 workspace's own crates) are updated along with it. Outputs: `version`, `tag`.
+
+**Without a version file** (`version-file: ""`, e.g. snapraid-ui, or the Kodi add-on whose
+`addon.xml` gets the version at build time) the highest `vX.Y.Z` tag is raised and the current
+commit tagged; nothing is committed. Without any such tag the first one is `v0.0.1` (patch).
 
 The commit is pushed to the branch the workflow runs on, so that branch must accept pushes from
 GitHub Actions (no rule that requires a pull request for every change).
@@ -198,6 +202,84 @@ jobs:
 | `notes` | `""` | text above the generated notes |
 
 Output: `version`, the released `x.y.z`.
+
+## Browser extension stores
+
+[`.github/workflows/browser-extension-stores.yml`](.github/workflows/browser-extension-stores.yml)
+publishes a browser extension from an artifact of the same run: uploaded to the Chrome Web Store
+(published by hand there), published to Mozilla Add-ons with a source ZIP (`git archive`) for the
+review and to Microsoft Edge Add-ons with the Chrome build. The artifact (default `extension`) holds
+`<name>-chrome-<version>.zip` and `<name>-firefox-<version>.zip`; the version comes from the tag.
+
+```yaml
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      chrome: { type: boolean, default: true }
+      firefox: { type: boolean, default: true }
+      edge: { type: boolean, default: true }
+
+jobs:
+  checks:
+    uses: ./.github/workflows/check_build.yml   # uploads the artifact "extension"
+
+  release:
+    needs: checks
+    if: startsWith(github.ref, 'refs/tags/v')
+    uses: firsttris/workflows/.github/workflows/github-release.yml@v1
+    with:
+      release-artifact: extension
+    permissions:
+      contents: write
+
+  stores:
+    needs: release
+    uses: firsttris/workflows/.github/workflows/browser-extension-stores.yml@v1
+    with:
+      name: sendToKodi
+      firefox-addon-guid: sendtokodi@firsttris.github.io
+      # A tag push has no inputs: then every store
+      chrome: ${{ github.event_name == 'push' || inputs.chrome }}
+      firefox: ${{ github.event_name == 'push' || inputs.firefox }}
+      edge: ${{ github.event_name == 'push' || inputs.edge }}
+    secrets: inherit
+```
+
+Started by hand on an existing tag, the same workflow publishes that version again (e.g. to one
+store only); the GitHub release then only gets its files replaced.
+
+Secrets: `CHROME_EXTENSION_ID`, `CHROME_CLIENT_ID`, `CHROME_CLIENT_SECRET`, `CHROME_REFRESH_TOKEN`,
+`AMO_JWT_ISSUER`, `AMO_JWT_SECRET`, `EDGE_PRODUCT_ID`, `EDGE_API_KEY`, `EDGE_CLIENT_ID`.
+
+## VS Code extension publish
+
+[`.github/workflows/vscode-extension-publish.yml`](.github/workflows/vscode-extension-publish.yml)
+publishes the `.vsix` from an artifact of the same run (default `vsix`, from `vsce package`) to the
+Visual Studio Marketplace and to Open VSX. A version that is already there is skipped.
+
+```yaml
+jobs:
+  checks:
+    uses: ./.github/workflows/ci.yml   # runs `vsce package` and uploads the artifact "vsix"
+
+  release:
+    needs: checks
+    if: startsWith(github.ref, 'refs/tags/v')
+    uses: firsttris/workflows/.github/workflows/github-release.yml@v1
+    with:
+      release-artifact: vsix
+    permissions:
+      contents: write
+
+  publish:
+    needs: release
+    uses: firsttris/workflows/.github/workflows/vscode-extension-publish.yml@v1
+    secrets: inherit
+```
+
+Inputs `marketplace` and `open-vsx` (both `true`). Secrets: `VSCE_PAT`, `OVSX_PAT`.
 
 ## Versions
 

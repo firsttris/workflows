@@ -1,0 +1,63 @@
+name: VS Code extension publish
+
+# Reusable: publishes the .vsix, packaged earlier in the calling run, to the Visual Studio
+# Marketplace and to Open VSX. The caller builds, tests and releases first and calls this on a tag.
+# A version already in a marketplace is skipped, so a failed run can simply be started again.
+on:
+  workflow_call:
+    inputs:
+      artifact:
+        description: Artifact of the calling run with the .vsix
+        type: string
+        default: vsix
+      marketplace:
+        description: Publish to the Visual Studio Marketplace
+        type: boolean
+        default: true
+      open-vsx:
+        description: Publish to Open VSX
+        type: boolean
+        default: true
+    secrets:
+      VSCE_PAT:
+        required: false
+      OVSX_PAT:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}
+          path: ${{ runner.temp }}/vsix
+      - id: vsix
+        name: Find the .vsix
+        env:
+          DIR: ${{ runner.temp }}/vsix
+        run: |
+          mapfile -t files < <(find "$DIR" -name '*.vsix')
+          if (( ${#files[@]} != 1 )); then
+            echo "::error::Expected one .vsix in the artifact, found ${#files[@]}"
+            exit 1
+          fi
+          echo "path=${files[0]}" >> "$GITHUB_OUTPUT"
+      - name: Visual Studio Marketplace
+        if: inputs.marketplace
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+          VSIX: ${{ steps.vsix.outputs.path }}
+        run: npx --yes @vscode/vsce publish --packagePath "$VSIX" --skip-duplicate
+      - name: Open VSX
+        if: inputs.open-vsx
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+          VSIX: ${{ steps.vsix.outputs.path }}
+        run: npx --yes ovsx publish "$VSIX" --skip-duplicate
