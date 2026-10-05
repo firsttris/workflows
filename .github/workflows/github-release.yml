@@ -1,0 +1,94 @@
+name: GitHub release
+
+# Reusable: creates the GitHub release for the tag vX.Y.Z the caller runs on, with notes generated
+# from the pull requests and commits since the previous release, and attaches the files of an
+# artifact uploaded earlier in the calling run. The caller runs its own CI and build first and
+# calls this only on a tag (`if: startsWith(github.ref, 'refs/tags/v')`).
+on:
+  workflow_call:
+    inputs:
+      version-file:
+        description: File whose version must match the tag (package.json, Cargo.toml or a Kodi addon.xml); empty skips the check
+        type: string
+        default: package.json
+      tag-prefix:
+        type: string
+        default: v
+      release-artifact:
+        description: Name of an artifact uploaded earlier in the calling run; its files are attached to the release
+        type: string
+        default: ""
+      notes:
+        description: Text above the generated notes
+        type: string
+        default: ""
+    outputs:
+      version:
+        description: The released version (x.y.z)
+        value: ${{ jobs.release.outputs.version }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        if: inputs.version-file != ''
+
+      - id: version
+        name: Version
+        env:
+          VERSION_FILE: ${{ inputs.version-file }}
+          TAG_PREFIX: ${{ inputs.tag-prefix }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != "refs/tags/$TAG_PREFIX"* ]]; then
+            echo "::error::Not a version tag: $GITHUB_REF"
+            exit 1
+          fi
+          version="${GITHUB_REF_NAME#"$TAG_PREFIX"}"
+          if [[ -n "$VERSION_FILE" ]]; then
+            case "$VERSION_FILE" in
+              *.json) declared=$(jq -r .version "$VERSION_FILE") ;;
+              *.toml) declared=$(grep -m1 -E '^version *= *"' "$VERSION_FILE" | cut -d'"' -f2) ;;
+              *.xml) declared=$(grep -m1 -oP '<addon\b[^>]*?\sversion="\K[^"]+' "$VERSION_FILE") ;;
+              *) echo "::error::Unknown version file: $VERSION_FILE"; exit 1 ;;
+            esac
+            if [[ "$declared" != "$version" ]]; then
+              echo "::error::Tag $GITHUB_REF_NAME does not match version $declared in $VERSION_FILE"
+              exit 1
+            fi
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Release files
+        if: inputs.release-artifact != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.release-artifact }}
+          path: ${{ runner.temp }}/release-files
+
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NOTES: ${{ inputs.notes }}
+          VERSION: ${{ steps.version.outputs.version }}
+          FILES_DIR: ${{ runner.temp }}/release-files
+        run: |
+          set -euo pipefail
+          files=()
+          if [[ -d "$FILES_DIR" ]]; then mapfile -t files < <(find "$FILES_DIR" -type f); fi
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            # Created by hand on GitHub before the tag was pushed: only add the files.
+            if (( ${#files[@]} )); then gh release upload "$GITHUB_REF_NAME" "${files[@]}" --repo "$GITHUB_REPOSITORY" --clobber; fi
+            exit 0
+          fi
+          flags=()
+          # 1.2.0-rc.1 is a pre-release and does not become "latest"
+          if [[ "$VERSION" == *-* ]]; then flags+=(--prerelease); fi
+          gh release create "$GITHUB_REF_NAME" "${files[@]}" "${flags[@]}" --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "$GITHUB_REF_NAME" --generate-notes --notes "$NOTES"
+          echo "Released [$GITHUB_REF_NAME]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$GITHUB_REF_NAME)" >> "$GITHUB_STEP_SUMMARY"
