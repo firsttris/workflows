@@ -1,0 +1,137 @@
+name: Browser extension stores
+
+# Reusable: publishes a browser extension, built earlier in the calling run, to the Chrome Web
+# Store (uploaded, published by hand there), Mozilla Add-ons (with the sources for the review) and
+# Microsoft Edge Add-ons. The caller builds and releases first and calls this on a tag vX.Y.Z.
+#
+# The artifact holds <name>-chrome-<version>.zip and <name>-firefox-<version>.zip; Edge takes the
+# Chrome build. Each store needs its secrets (secrets: inherit), see the README.
+on:
+  workflow_call:
+    inputs:
+      name:
+        description: File name prefix of the ZIPs, e.g. sendToKodi
+        type: string
+        required: true
+      artifact:
+        description: Artifact of the calling run with the ZIPs
+        type: string
+        default: extension
+      firefox-addon-guid:
+        description: Add-on ID on Mozilla Add-ons, e.g. sendtokodi@firsttris.github.io
+        type: string
+        default: ""
+      chrome-publisher-id:
+        type: string
+        default: d115d63f-be46-4c44-8b9f-dbb5bdaf9fe2
+      chrome:
+        type: boolean
+        default: true
+      firefox:
+        type: boolean
+        default: true
+      edge:
+        type: boolean
+        default: true
+      tag-prefix:
+        type: string
+        default: v
+    secrets:
+      CHROME_EXTENSION_ID:
+        required: false
+      CHROME_CLIENT_ID:
+        required: false
+      CHROME_CLIENT_SECRET:
+        required: false
+      CHROME_REFRESH_TOKEN:
+        required: false
+      AMO_JWT_ISSUER:
+        required: false
+      AMO_JWT_SECRET:
+        required: false
+      EDGE_PRODUCT_ID:
+        required: false
+      EDGE_API_KEY:
+        required: false
+      EDGE_CLIENT_ID:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - id: version
+        name: Version from the tag
+        env:
+          TAG_PREFIX: ${{ inputs.tag-prefix }}
+        run: |
+          if [[ "$GITHUB_REF" != "refs/tags/$TAG_PREFIX"* ]]; then
+            echo "::error::Not a version tag: $GITHUB_REF"
+            exit 1
+          fi
+          echo "version=${GITHUB_REF_NAME#"$TAG_PREFIX"}" >> "$GITHUB_OUTPUT"
+
+  chrome:
+    needs: prepare
+    if: inputs.chrome
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}
+      - name: Upload to Chrome Web Store
+        uses: mnao305/chrome-extension-upload@f549d5d654694a7722d6abfa64c97409ad5e64c1 # v7.0.0
+        with:
+          file-path: ${{ inputs.name }}-chrome-${{ needs.prepare.outputs.version }}.zip
+          extension-id: ${{ secrets.CHROME_EXTENSION_ID }}
+          publisher-id: ${{ inputs.chrome-publisher-id }}
+          client-id: ${{ secrets.CHROME_CLIENT_ID }}
+          client-secret: ${{ secrets.CHROME_CLIENT_SECRET }}
+          refresh-token: ${{ secrets.CHROME_REFRESH_TOKEN }}
+          publish: false
+
+  firefox:
+    needs: prepare
+    if: inputs.firefox
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}
+          path: ${{ runner.temp }}/extension
+      # Mozilla reviewers need the sources of bundled code to reproduce the build.
+      - name: Sources for the review
+        env:
+          SOURCE_ZIP: ${{ runner.temp }}/${{ inputs.name }}-source-${{ needs.prepare.outputs.version }}.zip
+        run: git archive --format zip --output "$SOURCE_ZIP" HEAD
+      - name: Publish to Mozilla Add-ons
+        uses: wdzeng/firefox-addon@3184ee491b500e080885e046051366a4228c6e5d # v1.2.1
+        with:
+          addon-guid: ${{ inputs.firefox-addon-guid }}
+          xpi-path: ${{ runner.temp }}/extension/${{ inputs.name }}-firefox-${{ needs.prepare.outputs.version }}.zip
+          source-file-path: ${{ runner.temp }}/${{ inputs.name }}-source-${{ needs.prepare.outputs.version }}.zip
+          self-hosted: false
+          jwt-issuer: ${{ secrets.AMO_JWT_ISSUER }}
+          jwt-secret: ${{ secrets.AMO_JWT_SECRET }}
+
+  edge:
+    needs: prepare
+    if: inputs.edge
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}
+      - name: Publish to Microsoft Edge Add-ons
+        uses: wdzeng/edge-addon@9881f57720358040d079eaa06a4596dc9c273eb6 # v2.1.1
+        with:
+          product-id: ${{ secrets.EDGE_PRODUCT_ID }}
+          zip-path: ${{ inputs.name }}-chrome-${{ needs.prepare.outputs.version }}.zip
+          api-key: ${{ secrets.EDGE_API_KEY }}
+          client-id: ${{ secrets.EDGE_CLIENT_ID }}
