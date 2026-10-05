@@ -1,0 +1,192 @@
+name: Bump version
+
+# Reusable: raises the version (patch, minor or major) in the version file, commits it, tags the
+# commit vX.Y.Z and starts the caller's release workflow on that tag. It is the button in the
+# Actions tab for what `npm version minor && git push --follow-tags` does on a checkout.
+#
+# A tag pushed with the GITHUB_TOKEN starts no `on: push` workflow, so the release workflow is
+# started by hand (workflow_dispatch, which the GITHUB_TOKEN may trigger) on the new tag. It then
+# runs exactly as for a tag pushed from a checkout. The release workflow needs `workflow_dispatch:`
+# as a trigger.
+on:
+  workflow_call:
+    inputs:
+      bump:
+        description: patch, minor or major
+        type: string
+        default: patch
+      version-file:
+        description: package.json, Cargo.toml (also [workspace.package]) or a Kodi addon.xml
+        type: string
+        default: package.json
+      extra-files:
+        description: Further files carrying the same version, one per line (e.g. src-tauri/tauri.conf.json); same formats as version-file
+        type: string
+        default: ""
+      tag-prefix:
+        type: string
+        default: v
+      release-workflow:
+        description: Workflow file started on the new tag; empty starts nothing
+        type: string
+        default: release.yml
+    outputs:
+      version:
+        description: The new version (x.y.z)
+        value: ${{ jobs.bump.outputs.version }}
+      tag:
+        description: The new tag
+        value: ${{ jobs.bump.outputs.tag }}
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    # Two bumps at once would both read the same old version
+    concurrency:
+      group: bump-version-${{ github.repository }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      actions: write
+    outputs:
+      version: ${{ steps.bump.outputs.version }}
+      tag: ${{ steps.bump.outputs.tag }}
+    steps:
+      - name: On a branch
+        run: |
+          if [[ "$GITHUB_REF" != refs/heads/* ]]; then
+            echo "::error::Run this on a branch (usually the default branch), not on $GITHUB_REF"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - id: bump
+        name: Raise the version
+        env:
+          BUMP: ${{ inputs.bump }}
+          VERSION_FILE: ${{ inputs.version-file }}
+          EXTRA_FILES: ${{ inputs.extra-files }}
+          TAG_PREFIX: ${{ inputs.tag-prefix }}
+        shell: python
+        run: |
+          import json, os, re, sys
+          from pathlib import Path
+
+          def fail(message):
+              print(f"::error::{message}")
+              sys.exit(1)
+
+          # The patterns that find the version, the old version as group 2
+          PATTERNS = {
+              ".json": r'("version"\s*:\s*")([^"]+)(")',
+              ".toml": r'(^version\s*=\s*")([^"]+)(")',
+              ".xml": r'(<addon\b[^>]*?\sversion=")([^"]+)(")',
+          }
+
+          def pattern(path):
+              p = PATTERNS.get(path.suffix)
+              if p is None:
+                  fail(f"Unknown version file: {path}")
+              return re.compile(p, re.M)
+
+          def read(path):
+              if not path.is_file():
+                  fail(f"{path} not found")
+              if path.suffix == ".json":
+                  return json.loads(path.read_text(encoding="utf-8")).get("version") or fail(f"No version in {path}")
+              m = pattern(path).search(path.read_text(encoding="utf-8"))
+              return m[2] if m else fail(f"No version in {path}")
+
+          def replace(path, old, new, count=1):
+              text = path.read_text(encoding="utf-8")
+              done = 0
+              def sub(m):
+                  nonlocal done
+                  if done >= count or m[2] != old:
+                      return m[0]
+                  done += 1
+                  return m[1] + new + m[3]
+              path.write_text(pattern(path).sub(sub, text), encoding="utf-8")
+              if done == 0:
+                  fail(f"{path} does not carry version {old}")
+
+          # Cargo.lock: the workspace's own crates (no source line) at the old version
+          def replace_cargo_lock(path, old, new):
+              blocks = path.read_text(encoding="utf-8").split("\n[[package]]\n")
+              for i, block in enumerate(blocks[1:], 1):
+                  if not re.search(r"^source = ", block, re.M):
+                      blocks[i] = re.sub(rf'^version = "{re.escape(old)}"$', f'version = "{new}"', block, count=1, flags=re.M)
+              path.write_text("\n[[package]]\n".join(blocks), encoding="utf-8")
+
+          main = Path(os.environ["VERSION_FILE"])
+          extras = [Path(line.strip()) for line in os.environ["EXTRA_FILES"].splitlines() if line.strip()]
+          old = read(main)
+          m = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)(-[0-9A-Za-z.-]+)?", old)
+          if not m:
+              fail(f"{main}: {old} is not x.y.z")
+          major, minor, patch = map(int, m.groups()[:3])
+          bump = os.environ["BUMP"]
+          if bump == "major":
+              new = f"{major + 1}.0.0"
+          elif bump == "minor":
+              new = f"{major}.{minor + 1}.0"
+          elif bump == "patch":
+              # A pre-release (1.2.0-rc.1) becomes its release (1.2.0)
+              new = f"{major}.{minor}.{patch if m[4] else patch + 1}"
+          else:
+              fail(f"bump must be patch, minor or major, not {bump}")
+
+          # All files checked before the first one is written
+          for path in extras:
+              found = read(path)
+              if found != old:
+                  fail(f"{path} has version {found}, {main} has {old}")
+
+          changed = []
+          for path in [main, *extras]:
+              replace(path, old, new)
+              changed.append(path)
+              lock = path.with_name("package-lock.json") if path.name == "package.json" else None
+              if lock and lock.is_file():
+                  # The root entry and packages[""]
+                  replace(lock, old, new, count=2)
+                  changed.append(lock)
+              lock = path.with_name("Cargo.lock") if path.name == "Cargo.toml" else None
+              if lock and lock.is_file():
+                  replace_cargo_lock(lock, old, new)
+                  changed.append(lock)
+
+          tag = os.environ["TAG_PREFIX"] + new
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              out.write(f"version={new}\ntag={tag}\nfiles={' '.join(map(str, changed))}\n")
+          print(f"{old} → {new}: {', '.join(map(str, changed))}")
+
+      - name: Commit, tag and push
+        env:
+          TAG: ${{ steps.bump.outputs.tag }}
+          FILES: ${{ steps.bump.outputs.files }}
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null; then
+            echo "::error::Tag $TAG already exists"
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # shellcheck disable=SC2086 # one path per word
+          git add -- $FILES
+          git commit -m "Release $TAG"
+          git tag -a "$TAG" -m "Release $TAG"
+          # Both or neither: no tag without its commit on the branch
+          git push --atomic origin "HEAD:$GITHUB_REF" "refs/tags/$TAG"
+
+      - name: Start ${{ inputs.release-workflow }} on the tag
+        if: inputs.release-workflow != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.bump.outputs.tag }}
+          WORKFLOW: ${{ inputs.release-workflow }}
+        run: |
+          gh workflow run "$WORKFLOW" --repo "$GITHUB_REPOSITORY" --ref "$TAG"
+          echo "Tagged $TAG and started [$WORKFLOW]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/workflows/$WORKFLOW) on it" >> "$GITHUB_STEP_SUMMARY"
