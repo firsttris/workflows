@@ -156,7 +156,11 @@ jobs:
   request without a single run; marking it ready builds once, later pushes build again.
 - Every job in the file gets the same `if:`, and jobs with `needs:` inherit the skip.
 - Under `workflow_call` (from `release.yml`) there is no pull request, so the `if:` lets the jobs run.
-- Several CI files in one project: give each its own group (`ci-e2e-${{ github.ref }}`, ...).
+- Several CI files in one project: give each its own group (`e2e-${{ github.ref }}`, ...), otherwise
+  a release that calls them all cancels one of them.
+- `paths-ignore` skips the whole workflow, so a required status check would wait forever on a
+  docs-only pull request; leave it out where checks are required. The draft `if:` has no such
+  problem, a skipped job counts as passed.
 - Slow extras (Windows/macOS matrix, firmware compiles, E2E) can run only when the pull request is
   ready or only on `main`, not on every push.
 
