@@ -119,6 +119,51 @@ The same scheme everywhere, whatever is published:
 - The tag comes either from a checkout (`npm run release:minor`) or, without one, from the
   *Bump version* button in the Actions tab.
 
+## CI in every project
+
+The checks themselves differ per project (Bun, Node, Go, Rust, ESPHome, Python), so each project
+keeps its own `ci.yml`. A reusable workflow cannot set its caller's triggers or concurrency, so the
+part that keeps runs few is the same header, copied into every `ci.yml`:
+
+```yaml
+on:
+  push:
+    branches: [main]            # not every branch, pull requests build through pull_request
+    paths-ignore: ["**.md", "docs/**", "LICENSE"]
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths-ignore: ["**.md", "docs/**", "LICENSE"]
+  workflow_call:                # release.yml runs the same checks before publishing
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A new push to a pull request cancels its outdated run; runs on main and tags finish
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    # Draft pull requests do not build; "Ready for review" starts the run
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+```
+
+- **Draft while work is in progress.** An agent (or you) pushes as often as it likes to a draft pull
+  request without a single run; marking it ready builds once, later pushes build again.
+- Every job in the file gets the same `if:`, and jobs with `needs:` inherit the skip.
+- Under `workflow_call` (from `release.yml`) there is no pull request, so the `if:` lets the jobs run.
+- Several CI files in one project: give each its own group (`e2e-${{ github.ref }}`, ...), otherwise
+  a release that calls them all cancels one of them.
+- `paths-ignore` skips the whole workflow, so a required status check would wait forever on a
+  docs-only pull request; leave it out where checks are required. The draft `if:` has no such
+  problem, a skipped job counts as passed.
+- Slow extras (Windows/macOS matrix, firmware compiles, E2E) can run only when the pull request is
+  ready or only on `main`, not on every push.
+
 ## Bump version
 
 [`.github/workflows/bump-version.yml`](.github/workflows/bump-version.yml) raises the version
