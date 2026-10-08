@@ -198,6 +198,9 @@ Homematic und Homematic IP sind Marken der eQ-3 AG. Dieses Projekt steht in kein
   section.
 - A copyleft license (GPL, AGPL) gets half a sentence on what it means for the reader, e.g. "whoever
   runs Haben for others has to offer them the source code".
+- Personal sites (CV, website): MIT covers the code only; one line says the texts and photos are
+  "© Tristan Teufel, all rights reserved".
+- Customer projects are private and get no open-source license and no footer.
 - The language link only where a second README exists.
 - One "not affiliated with" line for the third-party names the project uses (Kodi, Homematic,
   Steam, ...), plus any disclaimer the project needs ("not tax advice").
