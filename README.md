@@ -164,6 +164,71 @@ jobs:
 - Slow extras (Windows/macOS matrix, firmware compiles, E2E) can run only when the pull request is
   ready or only on `main`, not on every push.
 
+## README footer in every project
+
+Every README ends the same way: first an invitation to star the project and to report bugs or ideas,
+then the small print with the license, the copyright, the other language version and the trademarks
+the project is not affiliated with.
+
+```html
+---
+
+<div align="center">
+
+⭐ Like namarr? A [star on GitHub](https://github.com/firsttris/namarr) helps others find it.<br>
+🐛 [Report a bug](https://github.com/firsttris/namarr/issues/new) · 💡 [Request a feature](https://github.com/firsttris/namarr/issues/new)
+
+<sub>License: <a href="LICENSE">AGPL-3.0</a> · © Tristan Teufel and contributors · <a href="README.de.md">Deutsche Version</a><br>
+Changed versions you pass on or run for others must offer their source code under the AGPL; a commercial license without these obligations is available via <a href="https://teufel-it.de">teufel-it.de</a>.<br>
+namarr is not affiliated with TMDB, TheTVDB, TVmaze or AniDB.</sub>
+
+</div>
+```
+
+In German:
+
+```html
+⭐ Gefällt dir MUI? Ein [Stern auf GitHub](https://github.com/firsttris/ccu-addon-mui) hilft anderen, es zu finden.<br>
+🐛 [Fehler melden](https://github.com/firsttris/ccu-addon-mui/issues/new) · 💡 [Idee vorschlagen](https://github.com/firsttris/ccu-addon-mui/issues/new)
+
+<sub>Lizenz: <a href="LICENSE">AGPL-3.0</a> · © Tristan Teufel und Mitwirkende · <a href="README.en.md">English version</a><br>
+Wer eine veränderte Version weitergibt oder für andere betreibt, muss ihren Quellcode unter der AGPL anbieten; eine kommerzielle Lizenz ohne diese Pflichten gibt es über <a href="https://teufel-it.de">teufel-it.de</a>.<br>
+Homematic und Homematic IP sind Marken der eQ-3 AG. Dieses Projekt steht in keiner Verbindung zu eQ-3 oder OpenCCU.</sub>
+```
+
+- Every project has a `LICENSE` file, and the footer links it; there is no separate `## License`
+  section.
+- A copyleft license (GPL, AGPL) gets half a sentence on what it means for the reader and the link
+  to a commercial license (teufel-it.de), as above. Only the current license is named, not earlier
+  ones.
+- Personal sites (CV, website): MIT covers the code only; one line says the texts and photos are
+  "© Tristan Teufel, all rights reserved".
+- Customer projects are private and get no open-source license and no footer.
+- The language link only where a second README exists.
+- One "not affiliated with" line for the third-party names the project uses (Kodi, Homematic,
+  Steam, ...), plus any disclaimer the project needs ("not tax advice").
+- With issue templates the links open them directly (`issues/new?template=bug_report.md`).
+- The empty lines inside the `<div>` matter: without them GitHub does not render the Markdown links.
+
+## Licenses
+
+Which license a project gets:
+
+| License | For | Projects |
+|---|---|---|
+| AGPL-3.0-only | web apps people host themselves: nobody may sell or host a changed version without publishing its source; a closed one needs a commercial license | ccu-addon-mui, namarr, quadeck, snapraid-ui, haul, haben, reactive-volcano-app |
+| GPL-3.0-only | programs installed on a machine (no network use to cover) | prefixr, oneclickhistorycleaner |
+| MIT | small tools and configurations, where reach matters more than protection, and projects with many outside contributors | vscode-jest-runner, the SendToKodi projects, the VS Code helpers, the ESP32/ESPHome configurations, gong-second-hand-dashboard |
+| MIT for the code, content reserved | personal sites | astro-cv, teufel-it-astro |
+| none | customer projects, private | gaiser-lager |
+
+A GPL or AGPL project has, next to `LICENSE` (the unchanged license text, so GitHub recognises it),
+a `NOTICE` with the copyright, an additional term under section 7(b) (modified versions keep "<name>
+by Tristan Teufel" with the link to the repository in the legal notices they show), the commercial
+license (teufel-it.de). The license lives in `LICENSE`, `NOTICE`,
+the README footer, the license field of `package.json`/`Cargo.toml` and the docs site's copyright
+line; the apps themselves stay untouched.
+
 ## Bump version
 
 [`.github/workflows/bump-version.yml`](.github/workflows/bump-version.yml) raises the version
