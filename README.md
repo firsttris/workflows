@@ -164,6 +164,46 @@ jobs:
 - Slow extras (Windows/macOS matrix, firmware compiles, E2E) can run only when the pull request is
   ready or only on `main`, not on every push.
 
+## README footer in every project
+
+Every README ends the same way: first an invitation to star the project and to report bugs or ideas,
+then the small print with the license, the copyright, the other language version and the trademarks
+the project is not affiliated with.
+
+```html
+---
+
+<div align="center">
+
+⭐ Like namarr? A [star on GitHub](https://github.com/firsttris/namarr) helps others find it.<br>
+🐛 [Report a bug](https://github.com/firsttris/namarr/issues/new) · 💡 [Request a feature](https://github.com/firsttris/namarr/issues/new)
+
+<sub>License: <a href="LICENSE">MIT</a> · © Tristan Teufel and contributors · <a href="README.de.md">Deutsche Version</a><br>
+namarr is not affiliated with TMDB, TheTVDB, TVmaze or AniDB.</sub>
+
+</div>
+```
+
+In German:
+
+```html
+⭐ Gefällt dir MUI? Ein [Stern auf GitHub](https://github.com/firsttris/ccu-addon-mui) hilft anderen, es zu finden.<br>
+🐛 [Fehler melden](https://github.com/firsttris/ccu-addon-mui/issues/new) · 💡 [Idee vorschlagen](https://github.com/firsttris/ccu-addon-mui/issues/new)
+
+<sub>Lizenz: <a href="LICENSE">MIT</a> · © Tristan Teufel und Mitwirkende · <a href="README.en.md">English version</a><br>
+Homematic und Homematic IP sind Marken der eQ-3 AG. Dieses Projekt steht in keiner Verbindung zu eQ-3 oder OpenCCU.</sub>
+```
+
+- Every project has a `LICENSE` file, and the footer links it; there is no separate `## License`
+  section.
+- A copyleft license (GPL, AGPL) gets half a sentence on what it means for the reader, e.g. "whoever
+  runs Haben for others has to offer them the source code".
+- The language link only where a second README exists.
+- One "not affiliated with" line for the third-party names the project uses (Kodi, Homematic,
+  Steam, ...), plus any disclaimer the project needs ("not tax advice").
+- With issue templates the links open them directly (`issues/new?template=bug_report.md`).
+- The empty lines inside the `<div>` matter: without them GitHub does not render the Markdown links.
+
 ## Bump version
 
 [`.github/workflows/bump-version.yml`](.github/workflows/bump-version.yml) raises the version
