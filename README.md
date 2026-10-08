@@ -199,8 +199,8 @@ Homematic und Homematic IP sind Marken der eQ-3 AG. Dieses Projekt steht in kein
 - Every project has a `LICENSE` file, and the footer links it; there is no separate `## License`
   section.
 - A copyleft license (GPL, AGPL) gets half a sentence on what it means for the reader and the link
-  to a commercial license (teufel-it.de), as above. After a license change the footer names the old
-  license up to the last version released under it, e.g. "AGPL-3.0 (MIT up to v1.0.10)".
+  to a commercial license (teufel-it.de), as above. Only the current license is named, not earlier
+  ones.
 - Personal sites (CV, website): MIT covers the code only; one line says the texts and photos are
   "© Tristan Teufel, all rights reserved".
 - Customer projects are private and get no open-source license and no footer.
@@ -225,7 +225,7 @@ Which license a project gets:
 A GPL or AGPL project has, next to `LICENSE` (the unchanged license text, so GitHub recognises it),
 a `NOTICE` with the copyright, an additional term under section 7(b) (modified versions keep "<name>
 by Tristan Teufel" with the link to the repository in the legal notices they show), the commercial
-license (teufel-it.de) and the license of earlier versions. The license lives in `LICENSE`, `NOTICE`,
+license (teufel-it.de). The license lives in `LICENSE`, `NOTICE`,
 the README footer, the license field of `package.json`/`Cargo.toml` and the docs site's copyright
 line; the apps themselves stay untouched.
 
