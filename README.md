@@ -225,9 +225,9 @@ Which license a project gets:
 A GPL or AGPL project has, next to `LICENSE` (the unchanged license text, so GitHub recognises it),
 a `NOTICE` with the copyright, an additional term under section 7(b) (modified versions keep "<name>
 by Tristan Teufel" with the link to the repository in the legal notices they show), the commercial
-license (teufel-it.de) and the license of earlier versions. The app itself shows "<name> by Tristan
-Teufel · Source code (AGPL-3.0)" with the link at a place users find, such as the about or settings
-page; that is the source offer section 13 of the AGPL asks for.
+license (teufel-it.de) and the license of earlier versions. The license lives in `LICENSE`, `NOTICE`,
+the README footer, the license field of `package.json`/`Cargo.toml` and the docs site's copyright
+line; the apps themselves stay untouched.
 
 ## Bump version
 
