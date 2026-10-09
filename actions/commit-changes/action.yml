@@ -44,5 +44,17 @@ runs:
         fi
         { echo "Committed:"; git diff --cached --name-only | sed 's/^/- /'; } >> "$GITHUB_STEP_SUMMARY"
         git commit -m "$MESSAGE"
-        git push origin "HEAD:$GITHUB_REF"
+        # The branch may have moved during the run (a push, another run): put the commit on top
+        # of it and try again; a conflict in the same files stops here
+        branch="${GITHUB_REF#refs/heads/}"
+        for attempt in 1 2 3 4 5; do
+          git push origin "HEAD:$GITHUB_REF" && break
+          if (( attempt == 5 )); then
+            echo "::error::Could not push to $branch"
+            exit 1
+          fi
+          sleep $((attempt * 2))
+          git fetch origin "$branch"
+          git rebase "origin/$branch"
+        done
         echo "changed=true" >> "$GITHUB_OUTPUT"
