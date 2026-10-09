@@ -138,8 +138,8 @@ jobs:
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          mapfile -t paths < <(printf '%s\n' "$PATHS" | sed '/^[[:space:]]*$/d')
-          git add -- "${paths[@]}"
+          mapfile -t pathspecs < <(printf '%s\n' "$PATHS" | sed '/^[[:space:]]*$/d')
+          git add -- "${pathspecs[@]}"
           if git diff --cached --quiet; then
             echo "The screenshots are up to date." | tee -a "$GITHUB_STEP_SUMMARY"
             exit 0
