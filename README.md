@@ -391,13 +391,59 @@ jobs:
 
 Inputs `marketplace` and `open-vsx` (both `true`). Secrets: `VSCE_PAT`, `OVSX_PAT`.
 
+## Actions: Playwright image and commit changes
+
+Two building blocks for jobs a reusable workflow can't cover, because they need their own tools
+(Go, Deno, Rust, a cache, packages): the job stays in the project, these two steps come from here.
+*Screenshots* below uses them too.
+
+[`actions/playwright-image`](actions/playwright-image/action.yml) gives the official Playwright
+image of the `@playwright/test` version in the lockfile (`package-lock.json`, `bun.lock`,
+`pnpm-lock.yaml`, also in a subfolder). A job in that container needs no `playwright install`, and
+screenshots and visual baselines come out the same on every run. Outputs `image` and `version`.
+
+[`actions/commit-changes`](actions/commit-changes/action.yml) commits what changed under `paths`
+(one path or glob per line) with `message` as `github-actions[bot]` and pushes it to the branch the
+workflow runs on; nothing changed, nothing is committed. Output `changed`.
+
+```yaml
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.playwright.outputs.image }}
+    steps:
+      - id: playwright
+        uses: firsttris/workflows/actions/playwright-image@v1
+        with:
+          lockfile: e2e/package-lock.json
+
+  screenshots:
+    needs: image
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ needs.image.outputs.image }}
+      options: --ipc=host
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2      # whatever the project needs
+      - run: npm ci && npm run screenshots
+      - uses: firsttris/workflows/actions/commit-changes@v1
+        with:
+          paths: docs/screenshots
+```
+
 ## Screenshots
 
 [`.github/workflows/screenshots.yml`](.github/workflows/screenshots.yml) takes a project's
 screenshots (README, documentation, social preview) and commits the ones that changed to the branch
 it runs on. It runs in the official Playwright image of the `@playwright/test` version from the
 lockfile, so browser and fonts are the same on every run: an unchanged page gives an unchanged
-picture, and only real changes end up in the commit. Start it by hand after a change to the look;
+picture, and only real changes end up in the commit. It is the two actions above with
+installing and running in between; a project that needs more than Bun or a Postgres database
+writes that job itself with the actions. Start it by hand after a change to the look;
 the commit, pushed with the `GITHUB_TOKEN`, runs no checks.
 
 `.github/workflows/screenshots.yml` in a project:

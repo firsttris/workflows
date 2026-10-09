@@ -1,0 +1,46 @@
+name: Playwright image
+description: >-
+  The official Playwright image (mcr.microsoft.com/playwright:vX.Y.Z-noble) of the @playwright/test
+  version in a lockfile, for a job's container. Browsers, their system libraries and fonts are in it,
+  so no playwright install runs and pictures come out the same on every run.
+
+inputs:
+  lockfile:
+    description: package-lock.json, bun.lock or pnpm-lock.yaml with @playwright/test, also in a subfolder (e2e/package-lock.json)
+    default: package-lock.json
+
+outputs:
+  image:
+    description: mcr.microsoft.com/playwright:vX.Y.Z-noble
+    value: ${{ steps.version.outputs.image }}
+  version:
+    description: The @playwright/test version (X.Y.Z)
+    value: ${{ steps.version.outputs.version }}
+
+runs:
+  using: composite
+  steps:
+    # Only the lockfile, when the job hasn't checked out the repository itself
+    - if: hashFiles(inputs.lockfile) == ''
+      uses: actions/checkout@v4
+      with:
+        sparse-checkout: ${{ inputs.lockfile }}
+        sparse-checkout-cone-mode: false
+
+    - id: version
+      shell: bash
+      env:
+        LOCKFILE: ${{ inputs.lockfile }}
+      run: |
+        if [[ "$LOCKFILE" == *.json ]]; then
+          version=$(jq -r '.packages["node_modules/@playwright/test"].version // empty' "$LOCKFILE")
+        else
+          # bun.lock: "@playwright/test@1.2.3", pnpm-lock.yaml: '@playwright/test@1.2.3' or /@playwright/test@1.2.3
+          version=$(grep -oE '@playwright/test@[0-9]+\.[0-9]+\.[0-9]+' "$LOCKFILE" | head -1 | cut -d@ -f3)
+        fi
+        if [[ -z "$version" ]]; then
+          echo "::error::No @playwright/test in $LOCKFILE"
+          exit 1
+        fi
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+        echo "image=mcr.microsoft.com/playwright:v$version-noble" >> "$GITHUB_OUTPUT"

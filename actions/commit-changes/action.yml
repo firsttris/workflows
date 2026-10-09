@@ -1,0 +1,48 @@
+name: Commit changes
+description: >-
+  Commits what changed under the given paths (screenshots, baselines, generated files) as
+  github-actions[bot] and pushes it to the branch the workflow runs on. Nothing changed: nothing
+  is committed. The job needs contents: write; a push with the GITHUB_TOKEN starts no other workflow.
+
+inputs:
+  paths:
+    description: What is committed, one path or glob per line
+    required: true
+  message:
+    description: Commit message
+    default: Update screenshots
+
+outputs:
+  changed:
+    description: "true when something was committed"
+    value: ${{ steps.commit.outputs.changed }}
+
+runs:
+  using: composite
+  steps:
+    - id: commit
+      shell: bash
+      env:
+        PATHS: ${{ inputs.paths }}
+        MESSAGE: ${{ inputs.message }}
+      run: |
+        set -euo pipefail
+        if [[ "$GITHUB_REF" != refs/heads/* ]]; then
+          echo "::error::Run this on a branch, not on $GITHUB_REF"
+          exit 1
+        fi
+        # In a container the workspace belongs to another user
+        git config --global --add safe.directory "$GITHUB_WORKSPACE"
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        mapfile -t pathspecs < <(printf '%s\n' "$PATHS" | sed '/^[[:space:]]*$/d')
+        git add -- "${pathspecs[@]}"
+        if git diff --cached --quiet; then
+          echo "Nothing changed." | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "changed=false" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        { echo "Committed:"; git diff --cached --name-only | sed 's/^/- /'; } >> "$GITHUB_STEP_SUMMARY"
+        git commit -m "$MESSAGE"
+        git push origin "HEAD:$GITHUB_REF"
+        echo "changed=true" >> "$GITHUB_OUTPUT"
