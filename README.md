@@ -425,6 +425,7 @@ jobs:
 | `command` | – | takes the screenshots, e.g. `npm run screenshots` (required) |
 | `install` | `npm ci` | e.g. `bun install --frozen-lockfile` or `corepack enable && pnpm install --frozen-lockfile` |
 | `bun` | `false` | install Bun first |
+| `bun-version` | `latest` | e.g. `1.4.x` |
 | `lockfile` | `package-lock.json` | `package-lock.json`, `bun.lock` or `pnpm-lock.yaml` with the `@playwright/test` version |
 | `paths` | `docs` | what is committed, one path or glob per line |
 | `commit-message` | `Update screenshots` | |

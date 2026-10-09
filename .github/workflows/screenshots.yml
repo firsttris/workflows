@@ -22,6 +22,10 @@ on:
         description: Install Bun first (for bun install / bun run)
         type: boolean
         default: false
+      bun-version:
+        description: Bun version or range for npm, e.g. 1.4.x
+        type: string
+        default: latest
       lockfile:
         description: package-lock.json, bun.lock or pnpm-lock.yaml with the @playwright/test version
         type: string
@@ -111,7 +115,9 @@ jobs:
       # The npm package brings the binary without curl or unzip, which the image lacks
       - name: Bun
         if: inputs.bun
-        run: npm install --global bun
+        run: npm install --global "bun@$BUN_VERSION"
+        env:
+          BUN_VERSION: ${{ inputs.bun-version }}
 
       - name: Install
         run: ${{ inputs.install }}
