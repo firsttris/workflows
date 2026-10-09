@@ -1,0 +1,119 @@
+name: Screenshots
+
+# Reusable: takes the project's screenshots in the official Playwright image and commits the ones
+# that changed to the branch it runs on. The image matches the @playwright/test version from the
+# lockfile, so the browser and its fonts are the same on every run and an unchanged page gives an
+# unchanged picture.
+#
+# The caller is started by hand (workflow_dispatch) after a change to the look. A commit pushed
+# with the GITHUB_TOKEN starts no other workflow, so the pictures don't run the checks again.
+on:
+  workflow_call:
+    inputs:
+      command:
+        description: Takes the screenshots, e.g. npm run screenshots
+        type: string
+        required: true
+      install:
+        description: Installs the dependencies
+        type: string
+        default: npm ci
+      bun:
+        description: Install Bun first (for bun install / bun run)
+        type: boolean
+        default: false
+      lockfile:
+        description: package-lock.json, bun.lock or pnpm-lock.yaml with the @playwright/test version
+        type: string
+        default: package-lock.json
+      paths:
+        description: What is committed, one path or glob per line
+        type: string
+        default: docs
+      commit-message:
+        type: string
+        default: Update screenshots
+
+permissions:
+  contents: read
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.version.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: ${{ inputs.lockfile }}
+          sparse-checkout-cone-mode: false
+      - id: version
+        name: Playwright version from the lockfile
+        env:
+          LOCKFILE: ${{ inputs.lockfile }}
+        run: |
+          if [[ "$LOCKFILE" == *.json ]]; then
+            version=$(jq -r '.packages["node_modules/@playwright/test"].version // empty' "$LOCKFILE")
+          else
+            # bun.lock: "@playwright/test@1.2.3", pnpm-lock.yaml: '@playwright/test@1.2.3' or /@playwright/test@1.2.3
+            version=$(grep -oE '@playwright/test@[0-9]+\.[0-9]+\.[0-9]+' "$LOCKFILE" | head -1 | cut -d@ -f3)
+          fi
+          if [[ -z "$version" ]]; then
+            echo "::error::No @playwright/test in $LOCKFILE"
+            exit 1
+          fi
+          echo "image=mcr.microsoft.com/playwright:v$version-noble" >> "$GITHUB_OUTPUT"
+
+  screenshots:
+    needs: image
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ needs.image.outputs.image }}
+      options: --ipc=host
+    # Two runs at once would push on top of each other
+    concurrency:
+      group: screenshots-${{ github.repository }}-${{ github.ref }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    steps:
+      - name: On a branch
+        run: |
+          if [[ "$GITHUB_REF" != refs/heads/* ]]; then
+            echo "::error::Run this on a branch, not on $GITHUB_REF"
+            exit 1
+          fi
+        shell: bash
+
+      - uses: actions/checkout@v4
+
+      # The npm package brings the binary without curl or unzip, which the image lacks
+      - name: Bun
+        if: inputs.bun
+        run: npm install --global bun
+
+      - name: Install
+        run: ${{ inputs.install }}
+
+      - name: Take the screenshots
+        run: ${{ inputs.command }}
+
+      - name: Commit what changed
+        env:
+          PATHS: ${{ inputs.paths }}
+          MESSAGE: ${{ inputs.commit-message }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          mapfile -t paths < <(printf '%s\n' "$PATHS" | sed '/^[[:space:]]*$/d')
+          git add -- "${paths[@]}"
+          if git diff --cached --quiet; then
+            echo "The screenshots are up to date." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          { echo "Changed:"; git diff --cached --name-only | sed 's/^/- /'; } >> "$GITHUB_STEP_SUMMARY"
+          git commit -m "$MESSAGE"
+          git push origin "HEAD:$GITHUB_REF"
