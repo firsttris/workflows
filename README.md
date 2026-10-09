@@ -428,6 +428,8 @@ jobs:
 | `lockfile` | `package-lock.json` | `package-lock.json`, `bun.lock` or `pnpm-lock.yaml` with the `@playwright/test` version |
 | `paths` | `docs` | what is committed, one path or glob per line |
 | `commit-message` | `Update screenshots` | |
+| `postgres` | `""` | Postgres image, e.g. `postgres:16`, for a database next to the job; its URL is in `$POSTGRES_URL` |
+| `postgres-db` | `screenshots` | name of that database |
 
 The command starts whatever the pictures need (a dev server, a production build with demo data, a
 mock) and stops it again. Like *Bump version*, the branch must accept pushes from GitHub Actions.

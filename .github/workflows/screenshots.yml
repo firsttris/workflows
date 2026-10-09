@@ -33,6 +33,14 @@ on:
       commit-message:
         type: string
         default: Update screenshots
+      postgres:
+        description: Postgres image (e.g. postgres:16) for a database next to the job; empty starts none
+        type: string
+        default: ""
+      postgres-db:
+        description: Name of that database
+        type: string
+        default: screenshots
 
 permissions:
   contents: read
@@ -70,6 +78,19 @@ jobs:
     container:
       image: ${{ needs.image.outputs.image }}
       options: --ipc=host
+    # A service with an empty image is not started
+    services:
+      postgres:
+        image: ${{ inputs.postgres }}
+        env:
+          POSTGRES_USER: screenshots
+          POSTGRES_PASSWORD: screenshots
+          POSTGRES_DB: ${{ inputs.postgres-db }}
+        options: >-
+          --health-cmd "pg_isready -U screenshots"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     # Two runs at once would push on top of each other
     concurrency:
       group: screenshots-${{ github.repository }}-${{ github.ref }}
@@ -97,6 +118,9 @@ jobs:
 
       - name: Take the screenshots
         run: ${{ inputs.command }}
+        env:
+          # The database of the input postgres, reachable from the job's container by its service name
+          POSTGRES_URL: ${{ inputs.postgres != '' && format('postgres://screenshots:screenshots@postgres:5432/{0}', inputs.postgres-db) || '' }}
 
       - name: Commit what changed
         env:
