@@ -391,6 +391,50 @@ jobs:
 
 Inputs `marketplace` and `open-vsx` (both `true`). Secrets: `VSCE_PAT`, `OVSX_PAT`.
 
+## Screenshots
+
+[`.github/workflows/screenshots.yml`](.github/workflows/screenshots.yml) takes a project's
+screenshots (README, documentation, social preview) and commits the ones that changed to the branch
+it runs on. It runs in the official Playwright image of the `@playwright/test` version from the
+lockfile, so browser and fonts are the same on every run: an unchanged page gives an unchanged
+picture, and only real changes end up in the commit. Start it by hand after a change to the look;
+the commit, pushed with the `GITHUB_TOKEN`, runs no checks.
+
+`.github/workflows/screenshots.yml` in a project:
+
+```yaml
+name: Update screenshots
+
+on:
+  workflow_dispatch:
+
+jobs:
+  screenshots:
+    uses: firsttris/workflows/.github/workflows/screenshots.yml@v1
+    with:
+      command: npm run screenshots
+      paths: |
+        docs/*.png
+        public/screenshots
+    permissions:
+      contents: write
+```
+
+| Input | Default | |
+|---|---|---|
+| `command` | – | takes the screenshots, e.g. `npm run screenshots` (required) |
+| `install` | `npm ci` | e.g. `bun install --frozen-lockfile` or `corepack enable && pnpm install --frozen-lockfile` |
+| `bun` | `false` | install Bun first |
+| `bun-version` | `latest` | e.g. `1.4.x` |
+| `lockfile` | `package-lock.json` | `package-lock.json`, `bun.lock` or `pnpm-lock.yaml` with the `@playwright/test` version |
+| `paths` | `docs` | what is committed, one path or glob per line |
+| `commit-message` | `Update screenshots` | |
+| `postgres` | `""` | Postgres image, e.g. `postgres:16`, for a database next to the job; its URL is in `$POSTGRES_URL` |
+| `postgres-db` | `screenshots` | name of that database |
+
+The command starts whatever the pictures need (a dev server, a production build with demo data, a
+mock) and stops it again. Like *Bump version*, the branch must accept pushes from GitHub Actions.
+
 ## Versions
 
 Callers pin `@v1`. After a compatible change, run *Move major tag* (Actions → Run workflow on
