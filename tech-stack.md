@@ -65,19 +65,14 @@ As chrome.sendtokodi and oneclickhistorycleaner do it:
 
 ## VS Code extensions
 
+As vscode-jest-runner does it:
+
 | | Preferred | Notes |
 |---|---|---|
-| Build | TypeScript, **bundled with Vite** (as vscode-jest-runner) | |
-| Tests | Vitest for the logic, `@vscode/test-electron` for tests inside the editor | |
-| Release | `vscode-extension-publish.yml`: Visual Studio Marketplace and Open VSX | [README](README.md#vs-code-extension-publish) |
+| Build | TypeScript, **bundled with Vite** into one file; Biome; `tsc --noEmit` | |
+| Tests | Vitest for the logic, `@vscode/test-electron` for tests inside the editor | CI on Linux, Windows and macOS |
+| Release | `bump.yml` (the shared bump workflow) tags `vX.Y.Z`; `release.yml` on the tag runs the CI, which also builds the `.vsix`, then `github-release.yml` with the `.vsix` and `vscode-extension-publish.yml` to the Visual Studio Marketplace and Open VSX | [README](README.md#vs-code-extension-publish) |
 | Package manager | npm may stay here | `vsce` works best with it |
-
-## Other platforms
-
-| | Preferred | Notes |
-|---|---|---|
-| Kodi add-ons | **Python**, tests with **pytest** and pytest-cov, docs with MkDocs | plugin.video.sendtokodi |
-| ESP32 firmware | **ESPHome** YAML, built and flashed with Docker Compose | the esp32c6 routers, esphome-energy-dashboard |
 
 ## Tooling
 
