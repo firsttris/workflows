@@ -210,6 +210,13 @@ Homematic und Homematic IP sind Marken der eQ-3 AG. Dieses Projekt steht in kein
 - With issue templates the links open them directly (`issues/new?template=bug_report.md`).
 - The empty lines inside the `<div>` matter: without them GitHub does not render the Markdown links.
 
+## Tech stack
+
+[`tech-stack.md`](tech-stack.md) lists the technologies the projects use and which one is
+preferred: React with TanStack, shadcn/ui-style components with Tailwind, Paraglide for
+translations, Biome, TypeScript on both ends unless performance calls for Rust or Go, and so on.
+A new project or a new part starts from it; the CLAUDE.md template points there.
+
 ## Templates: CLAUDE.md and README
 
 Two templates for every project, in `templates/`. Each project keeps one filled-in file; nothing
