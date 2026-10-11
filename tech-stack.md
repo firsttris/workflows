@@ -39,7 +39,7 @@ project's CLAUDE.md.
 
 | | Preferred | Notes |
 |---|---|---|
-| Framework | **Tauri 2**: a Rust core with the web UI of the frontend stack above (React, TanStack, Tailwind) in the system's web view | a few MB instead of Electron's ~100 MB; on Linux it needs WebKitGTK. A tool without a window (like `haul-cnl`) is a plain Rust binary |
+| Framework | **Tauri 2**: a Rust core with the web UI of the frontend stack above (React, TanStack, Tailwind) in the system's web view | as in fernsicht (React) and prefixr (Svelte); a few MB instead of Electron's ~100 MB; on Linux it needs WebKitGTK. A tool without a window (like `haul-cnl`) is a plain Rust binary |
 | Structure | the desktop crate outside the main Cargo workspace, built and tested by its own CI job | keeps WebKitGTK out of the other builds (fernsicht) |
 | Commands | small `#[tauri::command]` functions at the edge, the logic in pure Rust functions with unit tests | typed TypeScript bindings with **tauri-specta** once it is stable (2.x is still a release candidate) |
 | Security | capabilities with only the permissions each window needs, a strict CSP in `tauri.conf.json` | no remote content in the app window |
@@ -48,7 +48,7 @@ project's CLAUDE.md.
 | Packages | Linux: **AppImage**, plus `.deb`/`.rpm` or Flatpak where users expect them; Windows: NSIS installer; macOS: `.dmg` | macOS needs an Apple Developer account and notarization, Windows a code signing certificate; without them the systems warn on first start |
 | Updates | `tauri-plugin-updater` with its own signing key (required), `latest.json` in the GitHub release | |
 | Release | **tauri-action** builds every platform and uploads the bundles and `latest.json` to the release | one version in `Cargo.toml`, `tauri.conf.json` and `package.json`, raised together by the bump workflow |
-| Tests | Rust unit and integration tests; the UI with Vitest and with Playwright in a browser, IPC mocked through `@tauri-apps/api/mocks`; the real app end to end with WebdriverIO's Tauri service | the official `tauri-driver` covers Linux and Windows only |
+| Tests | **Playwright, as everywhere**: the UI from the Vite dev server in a browser, the Rust side mocked with `mockIPC` from `@tauri-apps/api/mocks`; this also gives the screenshots. Vitest for stores and logic (prefixr mocks `@tauri-apps/api` with `vi.mock`), Rust unit and integration tests for the core | Playwright cannot drive the real app window, since Tauri uses the system's web view (only WebView2 on Windows accepts `connectOverCDP`). Only when the finished app itself must be tested (window, menus, file dialogs): WebdriverIO's Tauri service; the official `tauri-driver` covers Linux and Windows only |
 
 ## Tooling
 
