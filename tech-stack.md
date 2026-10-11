@@ -35,6 +35,21 @@ project's CLAUDE.md.
 | ORM / SQL | **Drizzle** (TypeScript), **sqlx** (Rust) | | migrations checked in and embedded in the binary |
 | Auth | own small login for one admin (argon2id, session cookie, CSRF), passkeys with **SimpleWebAuthn**; **Better Auth** for multi-user apps | | |
 
+## Desktop apps
+
+| | Preferred | Notes |
+|---|---|---|
+| Framework | **Tauri 2**: a Rust core with the web UI of the frontend stack above (React, TanStack, Tailwind) in the system's web view | a few MB instead of Electron's ~100 MB; on Linux it needs WebKitGTK. A tool without a window (like `haul-cnl`) is a plain Rust binary |
+| Structure | the desktop crate outside the main Cargo workspace, built and tested by its own CI job | keeps WebKitGTK out of the other builds (fernsicht) |
+| Commands | small `#[tauri::command]` functions at the edge, the logic in pure Rust functions with unit tests | typed TypeScript bindings with **tauri-specta** once it is stable (2.x is still a release candidate) |
+| Security | capabilities with only the permissions each window needs, a strict CSP in `tauri.conf.json` | no remote content in the app window |
+| Plugins | the official ones as needed: `updater`, `single-instance`, `window-state`, `store`, `dialog`, `notification`, `autostart`, `deep-link`, `log` | |
+| Helper programs | sidecars (`bundle.externalBin`) | fernsicht ships its client and host agent this way |
+| Packages | Linux: **AppImage**, plus `.deb`/`.rpm` or Flatpak where users expect them; Windows: NSIS installer; macOS: `.dmg` | macOS needs an Apple Developer account and notarization, Windows a code signing certificate; without them the systems warn on first start |
+| Updates | `tauri-plugin-updater` with its own signing key (required), `latest.json` in the GitHub release | |
+| Release | **tauri-action** builds every platform and uploads the bundles and `latest.json` to the release | one version in `Cargo.toml`, `tauri.conf.json` and `package.json`, raised together by the bump workflow |
+| Tests | Rust unit and integration tests; the UI with Vitest and with Playwright in a browser, IPC mocked through `@tauri-apps/api/mocks`; the real app end to end with WebdriverIO's Tauri service | the official `tauri-driver` covers Linux and Windows only |
+
 ## Tooling
 
 | | Preferred | Notes |
@@ -64,5 +79,7 @@ To align when a project is touched anyway:
 - Formatter: ESLint in haben, ESLint and Prettier in prefixr, Prettier in fernsicht, none in
   quadeck, haul, ccu-addon-mui and gaiser-lager → Biome.
 - Charts: Chart.js in snapraid-ui → uPlot when the project is touched anyway.
+- Desktop releases: fernsicht builds only the AppImage with its own script; a reusable Tauri release
+  workflow (tauri-action, all platforms, updater) does not exist here yet.
 - Package manager: npm in snapraid-ui, ccu-addon-mui, reactive-volcano-app, the browser
   extensions and gaiser-lager → pnpm.
