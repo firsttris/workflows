@@ -101,7 +101,7 @@ As vscode-jest-runner does it:
 To align when a project is touched anyway:
 
 - Formatter: ESLint in haben, ESLint and Prettier in prefixr, Prettier in fernsicht, none in
-  quadeck, haul, ccu-addon-mui and gaiser-lager → Biome.
+  haul, ccu-addon-mui and gaiser-lager → Biome (quadeck has switched already).
 - Tailwind: haben and haul use their own CSS with CSS variables → Tailwind when the UI is reworked
   anyway.
 - Browser extensions: `haul/extension` is plain TypeScript with esbuild → Solid, Vite and
