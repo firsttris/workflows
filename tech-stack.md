@@ -16,18 +16,17 @@ project's CLAUDE.md.
 | Forms | plain controlled inputs; **TanStack Form** when a form grows | | validation with Zod |
 | Components | **shadcn/ui** style: own components in the repo, built on **Radix** (React) or **Kobalte** (Solid), variants with `class-variance-authority` | | no component library as a dependency |
 | CSS | **Tailwind CSS 4** | | design tokens as CSS variables, light and dark |
-| Icons | **lucide** | | |
+| Icons | **lucide** (`lucide-react`, `lucide-solid`) | | existing own icon sets (quadeck's `Glyph`) may stay |
 | Charts | **uPlot** (22 KB gzip, fast with many points, any framework) with one small wrapper per framework that reads the colours from the theme's CSS variables | own SVG for sparklines and charts with a few dozen points | no big chart libraries (Recharts 3 adds about 104 KB gzip, Chart.js about 55 KB); existing own charts (ccu-addon-mui, quadeck) stay while they are enough |
-| Localization | **Paraglide JS** (inlang) | | messages in `messages/{locale}.json`, compiled, typed |
+| Localization | **Paraglide JS** (inlang) | | messages in `messages/{locale}.json`, compiled, typed; browser extensions use `_locales/` instead (see below) |
 | PWA | when the app is used on a phone or tablet | | installable, offline shell |
-| Browser extensions | **Vite** with `@crxjs/vite-plugin`, Solid, Manifest V3 | | Chrome, Firefox and Edge from one code base |
 
 ## Backend
 
 | | Preferred | Also | Notes |
 |---|---|---|---|
 | Language | **TypeScript** when performance is no concern: one language front and back, shared types | **Rust** for performance, low latency, system and binary work; **Go** for small static binaries on devices (CCU) | |
-| Runtime (TypeScript) | **Bun** (one binary with `bun build --compile`) | Node; Deno where it is already in use (snapraid-ui) | |
+| Runtime (TypeScript) | **Bun** (one binary with `bun build --compile`) | Node (haben, gaiser-lager); Deno where it is already in use (snapraid-ui) | |
 | HTTP (TypeScript) | TanStack Start server routes and functions | **Hono** for a standalone API | |
 | HTTP (Rust) | **axum** on **tokio** | | `tracing` for logs, `thiserror` in libraries, `anyhow` in binaries, `serde`, `reqwest` |
 | Validation | **Zod** | | at every boundary: requests, config, files |
@@ -49,6 +48,36 @@ project's CLAUDE.md.
 | Updates | `tauri-plugin-updater` with its own signing key (required), `latest.json` in the GitHub release | |
 | Release | **tauri-action** builds every platform and uploads the bundles and `latest.json` to the release | one version in `Cargo.toml`, `tauri.conf.json` and `package.json`, raised together by the bump workflow |
 | Tests | **Playwright, as everywhere**: the UI from the Vite dev server in a browser, the Rust side mocked with `mockIPC` from `@tauri-apps/api/mocks`; this also gives the screenshots. Vitest for stores and logic (prefixr mocks `@tauri-apps/api` with `vi.mock`), Rust unit and integration tests for the core | Playwright cannot drive the real app window, since Tauri uses the system's web view (only WebView2 on Windows accepts `connectOverCDP`). Only when the finished app itself must be tested (window, menus, file dialogs): WebdriverIO's Tauri service; the official `tauri-driver` covers Linux and Windows only |
+
+## Browser extensions
+
+As chrome.sendtokodi and oneclickhistorycleaner do it:
+
+| | Preferred | Notes |
+|---|---|---|
+| Build | Manifest V3, **Solid** with **Vite** and `@crxjs/vite-plugin`, Tailwind, Biome | |
+| Browsers | Chrome, Edge and Firefox from one code base; Firefox through its own build command (`build:firefox`) | |
+| Texts | `_locales/{de,en}/messages.json` with `chrome.i18n` | the stores take the extension's name and description from there too |
+| Permissions | only what is needed; optional host permissions asked for when used; no tracking, a `PRIVACY.md` | |
+| Tests | Vitest for the logic; Playwright loads the popup and the options page as plain pages with a stand-in for the extension API (`chrome-stub.ts`), which also takes the screenshots | |
+| Store material | `store-assets/` (icon, banners, screenshots, texts), outside `public/` so it is not packaged | |
+| Release | the bump workflow and `browser-extension-stores.yml`: Chrome as a draft, Firefox with the source archive, Edge | [README](README.md#browser-extension-stores) |
+
+## VS Code extensions
+
+| | Preferred | Notes |
+|---|---|---|
+| Build | TypeScript, **bundled with Vite** (as vscode-jest-runner) | |
+| Tests | Vitest for the logic, `@vscode/test-electron` for tests inside the editor | |
+| Release | `vscode-extension-publish.yml`: Visual Studio Marketplace and Open VSX | [README](README.md#vs-code-extension-publish) |
+| Package manager | npm may stay here | `vsce` works best with it |
+
+## Other platforms
+
+| | Preferred | Notes |
+|---|---|---|
+| Kodi add-ons | **Python**, tests with **pytest** and pytest-cov, docs with MkDocs | plugin.video.sendtokodi |
+| ESP32 firmware | **ESPHome** YAML, built and flashed with Docker Compose | the esp32c6 routers, esphome-energy-dashboard |
 
 ## Tooling
 
@@ -78,6 +107,14 @@ To align when a project is touched anyway:
 
 - Formatter: ESLint in haben, ESLint and Prettier in prefixr, Prettier in fernsicht, none in
   quadeck, haul, ccu-addon-mui and gaiser-lager → Biome.
+- Tailwind: haben and haul use their own CSS with CSS variables → Tailwind when the UI is reworked
+  anyway.
+- Browser extensions: `haul/extension` is plain TypeScript with esbuild → Solid, Vite and
+  `@crxjs/vite-plugin` like the others; the Firefox build variable is `TARGET_PLATFORM=firefox` in
+  chrome.sendtokodi and `BROWSER=firefox` in oneclickhistorycleaner → one name.
+- VS Code extensions: vscode-distrobox-reveal and vscode-speech-language-switch compile with `tsc`
+  only → bundle with Vite; vscode-jest-runner still has a `.prettierrc` next to Biome → remove;
+  vscode-distrobox-reveal has no formatter → Biome.
 - Charts: Chart.js in snapraid-ui → uPlot when the project is touched anyway.
 - Desktop releases: fernsicht builds only the AppImage with its own script; a reusable Tauri release
   workflow (tauri-action, all platforms, updater) does not exist here yet.
