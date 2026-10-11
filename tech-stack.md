@@ -17,7 +17,7 @@ project's CLAUDE.md.
 | Components | **shadcn/ui** style: own components in the repo, built on **Radix** (React) or **Kobalte** (Solid), variants with `class-variance-authority` | | no component library as a dependency |
 | CSS | **Tailwind CSS 4** | | design tokens as CSS variables, light and dark |
 | Icons | **lucide** | | |
-| Charts | **Chart.js** | | one library across projects |
+| Charts | **uPlot** (22 KB gzip, fast with many points, any framework) with one small wrapper per framework that reads the colours from the theme's CSS variables | own SVG for sparklines and charts with a few dozen points | no big chart libraries (Recharts 3 adds about 104 KB gzip, Chart.js about 55 KB); existing own charts (ccu-addon-mui, quadeck) stay while they are enough |
 | Localization | **Paraglide JS** (inlang) | | messages in `messages/{locale}.json`, compiled, typed |
 | PWA | when the app is used on a phone or tablet | | installable, offline shell |
 | Browser extensions | **Vite** with `@crxjs/vite-plugin`, Solid, Manifest V3 | | Chrome, Firefox and Edge from one code base |
@@ -63,5 +63,6 @@ To align when a project is touched anyway:
 
 - Formatter: ESLint in haben, ESLint and Prettier in prefixr, Prettier in fernsicht, none in
   quadeck, haul, ccu-addon-mui and gaiser-lager → Biome.
+- Charts: Chart.js in snapraid-ui → uPlot when the project is touched anyway.
 - Package manager: npm in snapraid-ui, ccu-addon-mui, reactive-volcano-app, the browser
   extensions and gaiser-lager → pnpm.
