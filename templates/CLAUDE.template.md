@@ -1,8 +1,8 @@
 # Notes for Claude
 
 <!--
-Template for every project (firsttris/workflows, templates/CLAUDE.md). To use it, tell Claude:
-"Look at the template in firsttris/workflows and create a CLAUDE.md for this repository."
+Template for every project (firsttris/workflows, templates/CLAUDE.template.md). To use it, tell Claude:
+"Look at the CLAUDE.md template in firsttris/workflows and create a CLAUDE.md for this repository."
 Fill in the <…> parts from the repository, drop what does not apply, delete this comment.
 Keep it short: the file is loaded into every session.
 -->

@@ -210,13 +210,23 @@ Homematic und Homematic IP sind Marken der eQ-3 AG. Dieses Projekt steht in kein
 - With issue templates the links open them directly (`issues/new?template=bug_report.md`).
 - The empty lines inside the `<div>` matter: without them GitHub does not render the Markdown links.
 
-## CLAUDE.md in every project
+## Templates: CLAUDE.md and README
 
-[`templates/CLAUDE.md`](templates/CLAUDE.md) is the template for the notes Claude reads in every
-session: documentation, reference implementations, what goes with every change, the checks, pull
-requests, working rules and code style. In a new repository tell Claude: *"Look at the template in
-firsttris/workflows and create a CLAUDE.md for this repository."* It fills in the parts in `<…>`
-from the repository and drops what does not apply, so each project keeps one short file.
+Two templates for every project, in `templates/`. Each project keeps one filled-in file; nothing
+is loaded from here at run time.
+
+- [`CLAUDE.template.md`](templates/CLAUDE.template.md): the notes Claude reads in every session:
+  documentation, reference implementations, what goes with every change, checks, pull requests,
+  working rules and code style. Tell Claude: *"Look at the CLAUDE.md template in
+  firsttris/workflows and create a CLAUDE.md for this repository."*
+- [`README.template.md`](templates/README.template.md): the README, taken from the best ones
+  (quadeck, haul, fernsicht, snapraid-ui, vscode-jest-runner): a title and tagline in the words
+  people search for, badges, the install command and a screenshot at the top, then Why,
+  Install, Features, Screenshots, Alternatives, FAQ, Documentation, Development, Contributing
+  and the [footer](#readme-footer-in-every-project). The comment at its top lists the rules,
+  including the repository settings (description, website, topics, social preview). Tell
+  Claude: *"Look at the README template in firsttris/workflows and write the README for this
+  repository."*
 
 ## Licenses
 
