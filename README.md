@@ -210,6 +210,14 @@ Homematic und Homematic IP sind Marken der eQ-3 AG. Dieses Projekt steht in kein
 - With issue templates the links open them directly (`issues/new?template=bug_report.md`).
 - The empty lines inside the `<div>` matter: without them GitHub does not render the Markdown links.
 
+## CLAUDE.md in every project
+
+[`templates/CLAUDE.md`](templates/CLAUDE.md) is the template for the notes Claude reads in every
+session: documentation, reference implementations, what goes with every change, the checks, pull
+requests, working rules and code style. In a new repository tell Claude: *"Look at the template in
+firsttris/workflows and create a CLAUDE.md for this repository."* It fills in the parts in `<…>`
+from the repository and drops what does not apply, so each project keeps one short file.
+
 ## Licenses
 
 Which license a project gets:
