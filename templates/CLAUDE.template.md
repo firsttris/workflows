@@ -59,6 +59,11 @@ mkdocs build --strict    # when docs/ or mkdocs.yml changed
 Technology choices follow `tech-stack.md` in firsttris/workflows; <deviations of this project and
 why>.
 
+Clean Code, written functionally: clear names, small functions that do one thing, dependencies
+passed in, no duplication or dead code, comments that say why; the ideas behind SOLID and the
+design patterns are welcome as functions, data and closures, but not as classes, inheritance or
+class hierarchies.
+
 Functional, not object-oriented: pure functions that take data and return data, side effects at
 the edges; function components and hooks, no classes; errors as values. A file does one thing:
 split it past ~400 lines, a function past ~80. A refactor changes no behaviour.
