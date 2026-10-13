@@ -287,17 +287,21 @@ Homematic und Homematic IP sind Marken der eQ-3 AG. Dieses Projekt steht in kein
 [`tech-stack.md`](tech-stack.md) lists the technologies the projects use and which one is
 preferred: React with TanStack, shadcn/ui-style components with Tailwind, Paraglide for
 translations, Biome, TypeScript on both ends unless performance calls for Rust or Go, and so on.
-A new project or a new part starts from it; the CLAUDE.md template points there.
+A new project or a new part starts from it; the shared Claude rules point there.
 
-## Templates: CLAUDE.md and README
+## Templates: Claude notes and README
 
-Two templates for every project, in `templates/`. Each project keeps one filled-in file; nothing
-is loaded from here at run time.
+Templates for every project, in `templates/`:
 
-- [`CLAUDE.template.md`](templates/CLAUDE.template.md): the notes Claude reads in every session:
-  documentation, reference implementations, what goes with every change, checks, pull requests,
-  working rules and code style. Tell Claude: *"Look at the CLAUDE.md template in
-  firsttris/workflows and create a CLAUDE.md for this repository."*
+- [`rules.md`](templates/rules.md): the rules Claude follows in every project (before a change,
+  with every change, checks, pull requests, working rules, code style). It is copied verbatim to
+  `.claude/rules/firsttris.md`; Claude Code loads every file in `.claude/rules/` together with
+  `CLAUDE.md`, so the rules are always there, also in cloud sessions that only clone the project.
+  Change them here, then copy them into the projects again.
+- [`CLAUDE.template.md`](templates/CLAUDE.template.md): the project's own `CLAUDE.md` with only
+  what is specific to it (documentation pages, reference implementations, checks, deviations from
+  the tech stack, specifics); where it says otherwise, it wins over the rules. Tell Claude: *"Set
+  up the Claude notes from firsttris/workflows for this repository."*
 - [`README.template.md`](templates/README.template.md): the README, taken from the best ones
   (quadeck, haul, fernsicht, snapraid-ui, vscode-jest-runner): a title and tagline in the words
   people search for, badges, the install command and a screenshot at the top, then Why,
