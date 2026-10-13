@@ -94,7 +94,7 @@ As vscode-jest-runner does it:
 | CI and releases | the reusable workflows of this repository | [README](README.md) |
 | Server apps | **Docker image** (Docker Hub `tristanteu/…`, amd64 and arm64), run with **Podman Quadlets** or Docker Compose | or one binary with systemd units, when the app manages the host |
 | Documentation | **MkDocs Material** on GitHub Pages | the README links there |
-| Repository texts | README from [templates/README.template.md](templates/README.template.md), CLAUDE.md from [templates/CLAUDE.template.md](templates/CLAUDE.template.md) | |
+| Repository texts | README from [templates/README.template.md](templates/README.template.md); Claude notes: [templates/rules.md](templates/rules.md) as `.claude/rules/firsttris.md` plus a short `CLAUDE.md` from [templates/CLAUDE.template.md](templates/CLAUDE.template.md) | |
 
 ## Where the projects differ today
 
