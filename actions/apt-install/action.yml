@@ -1,0 +1,78 @@
+name: apt install
+description: >-
+  Installs Ubuntu packages with apt-get, the downloaded packages and the package lists kept in the
+  Actions cache. The Ubuntu mirror the runners use is sometimes very slow (100 MB at 130 kB/s took
+  13 minutes); with the cache the packages come from the cache instead, and only a new runner image
+  or a changed package list downloads them again. The man-db trigger, which rebuilds the man page
+  index after every install, is switched off.
+
+inputs:
+  packages:
+    description: The packages, separated by spaces or newlines
+    required: true
+  recommends:
+    description: Also install the recommended packages (apt-get's default); false adds --no-install-recommends
+    default: "true"
+
+outputs:
+  cache-hit:
+    description: "'true' when the packages came from the cache"
+    value: ${{ steps.cache.outputs.cache-hit }}
+
+runs:
+  using: composite
+  steps:
+    - id: key
+      shell: bash
+      env:
+        PACKAGES: ${{ inputs.packages }}
+        RECOMMENDS: ${{ inputs.recommends }}
+      run: |
+        list=$(tr -s ' \n\t' '\n' <<< "$PACKAGES" | sed '/^$/d' | sort -u | tr '\n' ' ')
+        hash=$(printf '%s recommends=%s' "$list" "$RECOMMENDS" | sha256sum | cut -c1-16)
+        echo "packages=$list" >> "$GITHUB_OUTPUT"
+        # The runner image carries its own package versions: a new image starts a new cache
+        echo "key=apt-$ImageOS-$ImageVersion-$RUNNER_ARCH-$hash" >> "$GITHUB_OUTPUT"
+
+    - id: cache
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ runner.temp }}/apt-cache
+        key: ${{ steps.key.outputs.key }}
+
+    - shell: bash
+      env:
+        PACKAGES: ${{ steps.key.outputs.packages }}
+        RECOMMENDS: ${{ inputs.recommends }}
+        HIT: ${{ steps.cache.outputs.cache-hit }}
+        CACHE: ${{ runner.temp }}/apt-cache
+      run: |
+        set -euo pipefail
+        sudo rm -f /var/lib/man-db/auto-update
+        opts=(-y -q -o Acquire::Retries=3)
+        [[ "$RECOMMENDS" == "true" ]] || opts+=(--no-install-recommends)
+        # shellcheck disable=SC2206 # one argument per package
+        packages=($PACKAGES)
+        if [[ "$HIT" == "true" ]]; then
+          # The lists the cached packages were chosen from, so apt takes exactly those
+          sudo cp -a "$CACHE/lists/." /var/lib/apt/lists/
+          sudo cp "$CACHE"/archives/*.deb /var/cache/apt/archives/ 2>/dev/null || true
+          if sudo apt-get install "${opts[@]}" "${packages[@]}"; then
+            exit 0
+          fi
+          echo "::warning::Installing from the cache failed, downloading the packages"
+        fi
+        sudo apt-get update -q
+        sudo apt-get install "${opts[@]}" "${packages[@]}"
+        rm -rf "$CACHE"
+        mkdir -p "$CACHE/lists" "$CACHE/archives"
+        sudo cp -a /var/lib/apt/lists/. "$CACHE/lists/"
+        sudo rm -rf "$CACHE/lists/partial" "$CACHE/lists/lock"
+        sudo find /var/cache/apt/archives -maxdepth 1 -name '*.deb' -exec cp {} "$CACHE/archives/" \;
+        sudo chown -R "$(id -u):$(id -g)" "$CACHE"
+
+    - if: steps.cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ runner.temp }}/apt-cache
+        key: ${{ steps.key.outputs.key }}

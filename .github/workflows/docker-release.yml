@@ -8,6 +8,12 @@ name: Docker release
 # Every platform builds in its own job, arm64 on GitHub's native ARM runner (free for public
 # repositories, much faster than QEMU, which matters for compiled languages like Rust). A merge job
 # then joins the per-platform images into one multi-arch tag.
+#
+# The build cache lives in the registry (ghcr.io/<owner>/<repo>-buildcache:<platform>), not in the
+# Actions cache: an Actions cache written on tag v1.2.3 can't be read on tag v1.2.4 (only caches of
+# the same ref or the default branch are), so every release built from scratch. A registry cache is
+# the same for every ref and the CI's own image check can share it; the export only uploads the
+# layers that changed.
 on:
   workflow_call:
     inputs:
@@ -37,6 +43,10 @@ on:
         description: Also push to ghcr.io/<owner>/<repo>
         type: boolean
         default: false
+      cache:
+        description: Keep the build cache in ghcr.io/<owner>/<repo>-buildcache (needs packages write)
+        type: boolean
+        default: true
       version-file:
         description: File whose version must match the tag (package.json or Cargo.toml); empty skips the check
         type: string
@@ -68,6 +78,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       matrix: ${{ steps.plan.outputs.matrix }}
       names: ${{ steps.plan.outputs.names }}
+      cache: ${{ steps.plan.outputs.cache }}
     steps:
       - uses: actions/checkout@v4
 
@@ -124,6 +135,7 @@ jobs:
           with open(os.environ["GITHUB_OUTPUT"], "a") as out:
               out.write(f"matrix={json.dumps({'include': matrix})}\n")
               out.write(f"names={','.join(names)}\n")
+              out.write(f"cache=ghcr.io/{os.environ['GITHUB_REPOSITORY'].lower()}-buildcache\n")
 
   build:
     name: Build ${{ matrix.platform }}
@@ -146,7 +158,7 @@ jobs:
           username: ${{ inputs.dockerhub-user }}
           password: ${{ secrets.DOCKER_PAT }}
       - name: Log in to GHCR
-        if: inputs.ghcr
+        if: inputs.ghcr || inputs.cache
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -156,6 +168,24 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ needs.prepare.outputs.names }}
+      # The registry cache, and the Actions cache of the default branch as before (the CI's image
+      # check of older callers writes there). A cache that can't be written doesn't fail the build.
+      - id: cache
+        env:
+          CACHE: ${{ inputs.cache && format('{0}:{1}', needs.prepare.outputs.cache, matrix.pair) || '' }}
+          PAIR: ${{ matrix.pair }}
+        run: |
+          {
+            echo "from<<EOF"
+            if [[ -n "$CACHE" ]]; then echo "type=registry,ref=$CACHE"; fi
+            echo "type=gha,scope=$PAIR"
+            echo "EOF"
+            if [[ -n "$CACHE" ]]; then
+              echo "to=type=registry,ref=$CACHE,mode=max,ignore-error=true"
+            else
+              echo "to=type=gha,mode=max,scope=$PAIR,ignore-error=true"
+            fi
+          } >> "$GITHUB_OUTPUT"
 
       # Pushed by digest only; the merge job puts the tags on the multi-arch list.
       - id: build
@@ -166,8 +196,8 @@ jobs:
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
           outputs: type=image,"name=${{ needs.prepare.outputs.names }}",push-by-digest=true,name-canonical=true,push=true
-          cache-from: type=gha,scope=${{ matrix.pair }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.pair }}
+          cache-from: ${{ steps.cache.outputs.from }}
+          cache-to: ${{ steps.cache.outputs.to }}
       - name: Export digest
         env:
           DIGEST: ${{ steps.build.outputs.digest }}

@@ -1,6 +1,6 @@
 name: Lint
 
-# Only the workflows are linted, so only a change to them runs it.
+# Only the workflows are linted (and the apt-install action tried), so only a change to them runs it.
 on:
   push:
     paths:
@@ -20,3 +20,29 @@ jobs:
         run: |
           bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.7/scripts/download-actionlint.bash) 1.7.7
           ./actionlint -color
+
+  # The apt-install action itself: a first install fills the cache, a second job takes it from there
+  apt-install:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - id: first
+        uses: ./actions/apt-install
+        with:
+          packages: cowsay sl
+      - run: /usr/games/cowsay "first install, cache hit ${{ steps.first.outputs.cache-hit }}"
+
+  apt-install-cached:
+    needs: apt-install
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - id: second
+        uses: ./actions/apt-install
+        with:
+          packages: sl cowsay
+      - run: |
+          /usr/games/cowsay "second install, cache hit ${{ steps.second.outputs.cache-hit }}"
+          test "${{ steps.second.outputs.cache-hit }}" = true
