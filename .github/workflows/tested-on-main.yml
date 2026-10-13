@@ -1,0 +1,83 @@
+name: Tested on main
+
+# Reusable: whether main's CI already tested what a release run publishes, as the output `tested`.
+# The release workflow then skips its own run of the CI and goes straight to building and
+# publishing.
+#
+# A release commit from "Bump version" changes only version numbers (and is pushed with the
+# GITHUB_TOKEN, which starts no CI), so the CI runs of the commit before it cover the code. Only
+# version numbers means: after replacing every x.y.z in the changed lines, the removed and the
+# added lines are the same. For anything else (a branch run by hand, a release commit with more in
+# it) the commit itself must have green push runs, or `tested` is false and the CI runs.
+on:
+  workflow_call:
+    inputs:
+      workflows:
+        description: The CI workflow files that must have a green push run, one per line or comma-separated
+        type: string
+        default: ci.yml
+    outputs:
+      tested:
+        description: "'true' when every workflow had a green push run for the code"
+        value: ${{ jobs.tested.outputs.tested }}
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  tested:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      tested: ${{ steps.check.outputs.tested }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WORKFLOWS: ${{ inputs.workflows }}
+        shell: python
+        run: |
+          import os, re, subprocess
+
+          def git(*args):
+              return subprocess.run(["git", *args], capture_output=True, text=True).stdout
+
+          def only_versions(parent):
+              diff = git("diff", "-U0", "--no-color", parent, "HEAD")
+              semver = re.compile(r"\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?")
+              removed, added = [], []
+              for line in diff.splitlines():
+                  if line.startswith(("---", "+++")):
+                      continue
+                  if line.startswith("-"):
+                      removed.append(semver.sub("X", line[1:]))
+                  elif line.startswith("+"):
+                      added.append(semver.sub("X", line[1:]))
+              return bool(removed) and sorted(removed) == sorted(added)
+
+          commit = git("rev-parse", "HEAD").strip()
+          parent = git("rev-parse", "-q", "--verify", "HEAD^").strip()
+          if os.environ["GITHUB_REF"].startswith("refs/tags/") and parent and only_versions(parent):
+              print(f"The release commit changes only versions; looking at {parent[:7]}")
+              commit = parent
+
+          tested = True
+          for workflow in [w.strip() for w in re.split(r"[,\n]", os.environ["WORKFLOWS"]) if w.strip()]:
+              url = (f"repos/{os.environ['GITHUB_REPOSITORY']}/actions/workflows/{workflow}/runs"
+                     f"?head_sha={commit}&event=push&status=success&per_page=1")
+              count = subprocess.run(["gh", "api", url, "--jq", ".total_count"],
+                                     capture_output=True, text=True).stdout.strip()
+              green = count.isdigit() and int(count) > 0
+              print(f"{workflow}: {'green' if green else 'no green push run'} for {commit[:7]}")
+              tested = tested and green
+
+          summary = ("Already tested on main: the checks are skipped" if tested
+                     else "Not tested on main yet: the checks run")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as out:
+              out.write(f"{summary} ({commit[:7]})\n")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              out.write(f"tested={'true' if tested else 'false'}\n")

@@ -72,12 +72,20 @@ A new version is then the button from [Bump version](#bump-version), or on a che
 | `platforms` | `linux/amd64,linux/arm64` | comma-separated; anything but amd64 and arm64 (e.g. `linux/arm/v7`) builds under QEMU |
 | `native-runners` | `true` | build `arm64` on the ARM runner; `false` builds it under QEMU (private repositories without ARM runners) |
 | `ghcr` | `false` | also push `ghcr.io/<owner>/<repo>` |
+| `cache` | `true` | keep the build cache in `ghcr.io/<owner>/<repo>-buildcache` (the job needs `packages: write`) |
 | `version-file` | `package.json` | `package.json` or `Cargo.toml` that must match the tag; `""` skips the check |
 | `readme` | `README.md` | README for Docker Hub, relative links and images made absolute; `""` skips it |
 | `release-artifact` | `""` | name of an artifact uploaded earlier in the same run; its files are attached to the release |
 | `dockerhub-user` | `tristanteu` | |
 
 Secret: `DOCKER_PAT`, a Docker Hub access token (`secrets: inherit` passes it on).
+
+**Build cache.** Each platform keeps its cache in the registry,
+`ghcr.io/<owner>/<repo>-buildcache:linux-amd64` and `:linux-arm64`, not in the Actions cache. An
+Actions cache written on tag `v1.2.3` can't be read on `v1.2.4` (only the same ref and the default
+branch are), so before, every release compiled everything again, and arm64, which nothing on `main`
+ever wrote, always did. The CI's image check shares the amd64 cache through
+[`actions/docker-build`](#docker-build-for-the-ci).
 Output: `version`, the published `x.y.z` (empty for `edge`).
 
 ### Examples
@@ -107,6 +115,70 @@ jobs:
 
 **Without a version file** (the tag alone is the version): `version-file: ""`.
 
+## Tested on main
+
+[`.github/workflows/tested-on-main.yml`](.github/workflows/tested-on-main.yml) tells a release
+whether `main`'s CI already tested the code, so it doesn't run the whole CI again before building.
+A release commit from *Bump version* changes only version numbers (and starts no CI), so the green
+push runs of the commit before it count; any other commit needs green push runs of its own.
+
+```yaml
+jobs:
+  tested:
+    uses: firsttris/workflows/.github/workflows/tested-on-main.yml@v1
+    # with:
+    #   workflows: build.yml, playwright-e2e.yml   # default ci.yml
+    permissions:
+      actions: read
+      contents: read
+
+  checks:
+    needs: tested
+    if: needs.tested.outputs.tested != 'true'
+    uses: ./.github/workflows/ci.yml
+
+  docker:
+    needs: [tested, checks]
+    # The checks either passed or were not needed
+    if: ${{ !cancelled() && needs.tested.result == 'success' && needs.checks.result != 'failure' }}
+    uses: firsttris/workflows/.github/workflows/docker-release.yml@v1
+    # ...
+```
+
+## Docker build for the CI
+
+[`actions/docker-build`](actions/docker-build/action.yml) builds the image in the CI's image check
+and loads it into the local Docker, with the same registry cache as the release's amd64 build:
+
+```yaml
+  docker:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write   # keeps the cache
+    steps:
+      - uses: actions/checkout@v4
+      - uses: firsttris/workflows/actions/docker-build@v1
+        with:
+          dockerfile: docker/Dockerfile
+          tags: namarr:ci
+      - run: docker run --rm namarr:ci --version
+```
+
+## apt install
+
+[`actions/apt-install`](actions/apt-install/action.yml) installs Ubuntu packages with the downloaded
+packages and the package lists in the Actions cache, and without the man-db trigger. The mirror the
+runners use is sometimes very slow (100 MB at 130 kB/s, 13 minutes for the FFmpeg headers); with
+the cache only a new runner image or a changed package list downloads again.
+
+```yaml
+      - uses: firsttris/workflows/actions/apt-install@v1
+        with:
+          packages: libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev
+          # recommends: false   # --no-install-recommends
+```
+
 ## Releases in every project
 
 The same scheme everywhere, whatever is published:
@@ -114,8 +186,8 @@ The same scheme everywhere, whatever is published:
 - The version lives in the project's version file (`package.json`, `Cargo.toml`, a Kodi
   `addon.xml`); the tag is `v` + that version.
 - Only a tag starts a release. `release.yml` runs on `push: tags: ["v*"]` (and `workflow_dispatch`),
-  first the project's CI (`ci.yml` with `workflow_call:`), then the build and the publishing, last
-  the GitHub release.
+  first the project's CI (`ci.yml` with `workflow_call:`) unless [main already tested
+  it](#tested-on-main), then the build and the publishing, last the GitHub release.
 - The tag comes either from a checkout (`npm run release:minor`) or, without one, from the
   *Bump version* button in the Actions tab.
 
