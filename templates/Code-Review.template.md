@@ -1,4 +1,4 @@
-Reviewe die Änderungen (git diff gegen main). Schreib zu jeder Kategorie etwas, auch „keine Befunde“:
+Bitte mach ein ausführliches Code-Review von Main. Schreib zu jeder Kategorie etwas, auch „keine Befunde“:
 Korrektheit & Edge Cases (wichtigster Punkt) · Fehlerbehandlung · Sicherheit · Vereinfachung ·
 Performance · Clean Code & Konsistenz mit dem Repo · Tests · jede Regel aus CLAUDE.md einzeln
 
