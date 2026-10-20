@@ -122,8 +122,9 @@ jobs:
 [`.github/workflows/tested-on-main.yml`](.github/workflows/tested-on-main.yml) tells a release
 whether `main`'s CI already tested the code, so it doesn't run the whole CI again before building.
 A release commit from *Bump version* changes only version numbers (and starts no CI), so the green
-push runs of the commit before it count, also over several release commits in a row (`1.3.0-rc.1`,
-then `1.3.0`); any other commit needs green push runs of its own.
+push runs of the commit before it count, also over several release commits in a row without CI runs
+of their own (`1.3.0-rc.1`, then `1.3.0`); any other commit needs green push runs of its own, even
+one that only bumps a dependency's version.
 
 ```yaml
 jobs:
@@ -365,7 +366,7 @@ jobs:
 
 | Input | Default | |
 |---|---|---|
-| `bump` | `patch` | `patch`, `minor` or `major`; `patch` on `1.2.0-rc.1` gives `1.2.0`. Pre-releases (need a version file): `prepatch`, `preminor`, `premajor` (`1.2.0` → `1.3.0-rc.1`), `prerelease` (`1.3.0-rc.1` → `1.3.0-rc.2`) |
+| `bump` | `patch` | `patch`, `minor` or `major`; on a pre-release like `npm version` (`1.3.0-rc.1`: `patch` and `minor` give `1.3.0`). Pre-releases (need a version file): `prepatch`, `preminor`, `premajor` (`1.2.0` → `1.3.0-rc.1`), `prerelease` (`1.3.0-rc.1` → `1.3.0-rc.2`) |
 | `preid` | `rc` | identifier of a pre-release, e.g. `beta` |
 | `version-file` | `package.json` | `package.json`, `Cargo.toml` (also `[workspace.package]`) or a Kodi `addon.xml`; `""`: the tag alone is the version (see below) |
 | `extra-files` | `""` | further files with the same version, one per line, e.g. `src-tauri/tauri.conf.json` |
