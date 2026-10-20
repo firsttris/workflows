@@ -417,7 +417,6 @@ jobs:
 |---|---|---|
 | `version-file` | `package.json` | `package.json`, `Cargo.toml` or a Kodi `addon.xml` that must match the tag; `""` skips the check |
 | `tag-prefix` | `v` | |
-| `github-release` | `true` | create the GitHub release on a version tag; `false` for a second image, so only one call creates it |
 | `release-artifact` | `""` | name of an artifact uploaded earlier in the same run; its files are attached |
 | `notes` | `""` | text above the generated notes |
 

@@ -96,6 +96,7 @@ jobs:
       matrix: ${{ steps.plan.outputs.matrix }}
       names: ${{ steps.plan.outputs.names }}
       cache: ${{ steps.plan.outputs.cache }}
+      artifact: ${{ steps.plan.outputs.artifact }}
     steps:
       - uses: actions/checkout@v4
 
@@ -142,7 +143,7 @@ jobs:
           GHCR_IMAGE: ${{ inputs.ghcr-image }}
         shell: python
         run: |
-          import json, os
+          import json, os, re
           native = os.environ["NATIVE"] == "true"
           matrix = []
           for platform in [p.strip() for p in os.environ["PLATFORMS"].split(",") if p.strip()]:
@@ -163,6 +164,9 @@ jobs:
               out.write(f"matrix={json.dumps({'include': matrix})}\n")
               out.write(f"names={','.join(names)}\n")
               out.write(f"cache={ghcr}-buildcache\n")
+              # Digest artifacts per image: a second call in the same run must not upload or collect
+              # the same names. The _ ends the image part, so haben_ is no prefix of haben-backup_
+              out.write(f"artifact=docker-digest-{re.sub(r'[^a-z0-9]+', '-', os.environ['IMAGE'].lower()).strip('-')}_\n")
 
   build:
     name: Build ${{ matrix.platform }}
@@ -233,7 +237,7 @@ jobs:
           touch "$RUNNER_TEMP/digests/${DIGEST#sha256:}"
       - uses: actions/upload-artifact@v4
         with:
-          name: docker-digest-${{ matrix.pair }}
+          name: ${{ needs.prepare.outputs.artifact }}${{ matrix.pair }}
           path: ${{ runner.temp }}/digests/*
           if-no-files-found: error
           retention-days: 1
@@ -249,7 +253,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: ${{ runner.temp }}/digests
-          pattern: docker-digest-*
+          pattern: ${{ needs.prepare.outputs.artifact }}*
           merge-multiple: true
       - uses: docker/setup-buildx-action@v3
       - name: Log in to Docker Hub
