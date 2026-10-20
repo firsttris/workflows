@@ -153,11 +153,10 @@ jobs:
                   fail("Pre-releases need a version-file")
               if not re.fullmatch(r"[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*", preid):
                   fail(f"preid must be letters, digits or -, not only digits: {preid!r}")
-          # Like npm version: minor on 1.3.0-rc.2 gives 1.3.0, major on 2.0.0-rc.1 gives 2.0.0
           if bump == "major":
-              new = f"{major}.0.0" if m[4] and minor == patch == 0 else f"{major + 1}.0.0"
+              new = f"{major + 1}.0.0"
           elif bump == "minor":
-              new = f"{major}.{minor}.0" if m[4] and patch == 0 else f"{major}.{minor + 1}.0"
+              new = f"{major}.{minor + 1}.0"
           elif bump == "patch":
               # A pre-release (1.2.0-rc.1) becomes its release (1.2.0)
               new = f"{major}.{minor}.{patch if m[4] else patch + 1}"
