@@ -72,10 +72,12 @@ A new version is then the button from [Bump version](#bump-version), or on a che
 | `context` | `.` | |
 | `platforms` | `linux/amd64,linux/arm64` | comma-separated; anything but amd64 and arm64 (e.g. `linux/arm/v7`) builds under QEMU |
 | `native-runners` | `true` | build `arm64` on the ARM runner; `false` builds it under QEMU (private repositories without ARM runners) |
-| `ghcr` | `false` | also push `ghcr.io/<owner>/<repo>` |
-| `cache` | `true` | keep the build cache in `ghcr.io/<owner>/<repo>-buildcache` (the job needs `packages: write`) |
+| `ghcr` | `false` | also push `ghcr.io/<owner>/<repo>` (or `ghcr-image`) |
+| `ghcr-image` | `""` | GHCR image without `ghcr.io/` for a second image of the repository, e.g. `firsttris/haben-backup`; also names its build cache |
+| `cache` | `true` | keep the build cache in `ghcr.io/<ghcr image>-buildcache` (the job needs `packages: write`) |
 | `version-file` | `package.json` | `package.json` or `Cargo.toml` that must match the tag; `""` skips the check |
 | `readme` | `README.md` | README for Docker Hub, relative links and images made absolute; `""` skips it |
+| `github-release` | `true` | create the GitHub release on a version tag; `false` for a second image, so only one call creates it |
 | `release-artifact` | `""` | name of an artifact uploaded earlier in the same run; its files are attached to the release |
 | `dockerhub-user` | `tristanteu` | |
 
