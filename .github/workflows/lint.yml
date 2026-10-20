@@ -25,7 +25,11 @@ jobs:
   apt-install:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      image: ${{ steps.image.outputs.image }}
     steps:
+      - id: image
+        run: echo "image=$ImageVersion" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v4
       - id: first
         uses: ./actions/apt-install
@@ -43,6 +47,15 @@ jobs:
         uses: ./actions/apt-install
         with:
           packages: sl cowsay
-      - run: |
-          /usr/games/cowsay "second install, cache hit ${{ steps.second.outputs.cache-hit }}"
-          test "${{ steps.second.outputs.cache-hit }}" = true
+      # The cache key holds the runner image; while GitHub rolls out a new image the two jobs can land
+      # on different ones, and then there is no cache to hit
+      - env:
+          HIT: ${{ steps.second.outputs.cache-hit }}
+          FIRST_IMAGE: ${{ needs.apt-install.outputs.image }}
+        run: |
+          /usr/games/cowsay "second install, cache hit $HIT"
+          if [[ "$ImageVersion" != "$FIRST_IMAGE" ]]; then
+            echo "::notice::Runner image $ImageVersion, first job had $FIRST_IMAGE: different cache keys, the hit is not checked"
+            exit 0
+          fi
+          test "$HIT" = true
