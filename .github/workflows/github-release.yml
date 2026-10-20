@@ -94,7 +94,7 @@ jobs:
           else
             # Notes since the last release, not since its release candidates
             previous=$(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/$TAG_PREFIX" --paginate --jq '.[].ref | ltrimstr("refs/tags/")' \
-              | { grep -E "^$TAG_PREFIX[0-9]+\.[0-9]+\.[0-9]+$" || true; } | sort -V | awk -v cur="$GITHUB_REF_NAME" '$0 == cur {print prev; exit} {prev = $0}')
+              | { grep -E "^${TAG_PREFIX}[0-9]+\.[0-9]+\.[0-9]+$" || true; } | sort -V | awk -v cur="$GITHUB_REF_NAME" '$0 == cur {print prev; exit} {prev = $0}')
             if [[ -n "$previous" ]]; then flags+=(--notes-start-tag "$previous"); fi
           fi
           gh release create "$GITHUB_REF_NAME" "${files[@]}" "${flags[@]}" --repo "$GITHUB_REPOSITORY" --verify-tag \
