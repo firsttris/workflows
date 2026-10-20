@@ -339,6 +339,13 @@ jobs:
           fi
           flags=() also=latest
           # A pre-release does not become the repository's latest release
-          if [[ "$PRERELEASE" == true ]]; then flags+=(--prerelease); also=next; fi
+          if [[ "$PRERELEASE" == true ]]; then
+            flags+=(--prerelease) also=next
+          else
+            # Notes since the last release, not since its release candidates
+            previous=$(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/v" --paginate --jq '.[].ref | ltrimstr("refs/tags/")' \
+              | { grep -E "^v[0-9]+\.[0-9]+\.[0-9]+$" || true; } | sort -V | awk -v cur="$GITHUB_REF_NAME" '$0 == cur {print prev; exit} {prev = $0}')
+            if [[ -n "$previous" ]]; then flags+=(--notes-start-tag "$previous"); fi
+          fi
           gh release create "$GITHUB_REF_NAME" "${files[@]}" "${flags[@]}" --repo "$GITHUB_REPOSITORY" --verify-tag \
             --title "$GITHUB_REF_NAME" --generate-notes --notes "Docker: \`$IMAGE:$VERSION\` (also \`:$also\`)"
