@@ -367,7 +367,6 @@ jobs:
 |---|---|---|
 | `bump` | `patch` | `patch`, `minor` or `major`; `patch` on `1.2.0-rc.1` gives `1.2.0`. Pre-releases (need a version file): `prepatch`, `preminor`, `premajor` (`1.2.0` → `1.3.0-rc.1`), `prerelease` (`1.3.0-rc.1` → `1.3.0-rc.2`) |
 | `preid` | `rc` | identifier of a pre-release, e.g. `beta` |
-| `freeze-prerelease` | `false` | the release of a pre-release (`patch` on `1.3.0-rc.2`) fails when more than version numbers changed since the tag `v1.3.0-rc.2`; anything merged since goes out as another pre-release first |
 | `version-file` | `package.json` | `package.json`, `Cargo.toml` (also `[workspace.package]`) or a Kodi `addon.xml`; `""`: the tag alone is the version (see below) |
 | `extra-files` | `""` | further files with the same version, one per line, e.g. `src-tauri/tauri.conf.json` |
 | `tag-prefix` | `v` | |
@@ -378,10 +377,8 @@ workspace's own crates) are updated along with it. Outputs: `version`, `tag`.
 
 **Release candidates** on the default branch, no extra branch: `preminor` tags `v1.3.0-rc.1` and
 the [Docker release](#docker-release) pushes `:next`, while `:latest` stays on `1.2.x`; fixes go
-out as `prerelease` (`v1.3.0-rc.2`), and `patch` finally releases `v1.3.0`. With
-`freeze-prerelease: true` that last step only goes through when nothing but the fixes already in a
-pre-release landed in between. The numbering starts at `.1`; `npm version preminor --preid rc` on a
-checkout would start at `.0`.
+out as `prerelease` (`v1.3.0-rc.2`), and `patch` finally releases `v1.3.0`. The numbering starts
+at `.1`; `npm version preminor --preid rc` on a checkout would start at `.0`.
 
 **Without a version file** (`version-file: ""`, e.g. snapraid-ui, or the Kodi add-on whose
 `addon.xml` gets the version at build time) the highest `vX.Y.Z` tag is raised and the current
