@@ -2,8 +2,10 @@ name: Docker release
 
 # Reusable: builds a multi-arch image, pushes it, updates the Docker Hub description and, for a
 # version tag, creates the GitHub release. The caller decides when it runs (tag push, by hand) and
-# runs its own CI first. On a tag vX.Y.Z: :x.y.z, :x.y, :latest, then the GitHub release. Anywhere
-# else (e.g. run by hand on the default branch): :edge, no release.
+# runs its own CI first. On a tag vX.Y.Z: :x.y.z, :x.y, :latest, then the GitHub release. On a
+# pre-release tag vX.Y.Z-rc.N: :x.y.z-rc.N and :next, a GitHub pre-release, and the Docker Hub
+# description stays that of the last release. Anywhere else (e.g. run by hand on the default
+# branch): :edge, no release.
 #
 # Every platform builds in its own job, arm64 on GitHub's native ARM runner (free for public
 # repositories, much faster than QEMU, which matters for compiled languages like Rust). A merge job
@@ -68,14 +70,18 @@ on:
         required: true
     outputs:
       version:
-        description: The published version (x.y.z), empty for edge
+        description: The published version (x.y.z or x.y.z-rc.N), empty for edge
         value: ${{ jobs.prepare.outputs.version }}
+      prerelease:
+        description: "'true' for a pre-release (a version with a -, e.g. 1.2.0-rc.1)"
+        value: ${{ jobs.prepare.outputs.prerelease }}
 
 jobs:
   prepare:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
       matrix: ${{ steps.plan.outputs.matrix }}
       names: ${{ steps.plan.outputs.names }}
       cache: ${{ steps.plan.outputs.cache }}
@@ -106,7 +112,14 @@ jobs:
             fi
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "Publishing $version" >> "$GITHUB_STEP_SUMMARY"
+          # 1.2.0-rc.1 is a pre-release: :next instead of :x.y and :latest
+          if [[ "$version" == *-* ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+            echo "Publishing pre-release $version as :next" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+            echo "Publishing $version" >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - id: plan
         name: Platforms and image names
@@ -243,8 +256,9 @@ jobs:
           images: ${{ needs.prepare.outputs.names }}
           tags: |
             type=semver,pattern={{version}},value=${{ needs.prepare.outputs.version }},enable=${{ needs.prepare.outputs.version != '' }}
-            type=semver,pattern={{major}}.{{minor}},value=${{ needs.prepare.outputs.version }},enable=${{ needs.prepare.outputs.version != '' }}
-            type=raw,value=latest,enable=${{ needs.prepare.outputs.version != '' }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.prepare.outputs.version }},enable=${{ needs.prepare.outputs.prerelease == 'false' }}
+            type=raw,value=latest,enable=${{ needs.prepare.outputs.prerelease == 'false' }}
+            type=raw,value=next,enable=${{ needs.prepare.outputs.prerelease == 'true' }}
             type=raw,value=edge,enable=${{ needs.prepare.outputs.version == '' }}
       - name: Create the multi-arch tags
         working-directory: ${{ runner.temp }}/digests
@@ -260,10 +274,11 @@ jobs:
           TAG: ${{ steps.meta.outputs.version }}
         run: docker buildx imagetools inspect "$IMAGE:$TAG"
 
+      # A pre-release keeps the description of the last release
       - uses: actions/checkout@v4
-        if: inputs.readme != ''
+        if: inputs.readme != '' && needs.prepare.outputs.prerelease != 'true'
       - name: README for Docker Hub
-        if: inputs.readme != ''
+        if: inputs.readme != '' && needs.prepare.outputs.prerelease != 'true'
         env:
           README: ${{ inputs.readme }}
           BRANCH: ${{ github.event.repository.default_branch }}
@@ -285,7 +300,7 @@ jobs:
           text = re.sub(r"(\]\()([^)\s]+)", lambda m: m[1] + fix(m[2], blob), text)
           open("dockerhub-readme.md", "w", encoding="utf-8").write(text)
       - name: Update Docker Hub description
-        if: inputs.readme != ''
+        if: inputs.readme != '' && needs.prepare.outputs.prerelease != 'true'
         uses: peter-evans/dockerhub-description@v5
         with:
           username: ${{ inputs.dockerhub-user }}
@@ -312,6 +327,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           IMAGE: ${{ inputs.image }}
           VERSION: ${{ needs.prepare.outputs.version }}
+          PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
         run: |
           set -euo pipefail
           files=()
@@ -321,5 +337,8 @@ jobs:
             if (( ${#files[@]} )); then gh release upload "$GITHUB_REF_NAME" "${files[@]}" --repo "$GITHUB_REPOSITORY" --clobber; fi
             exit 0
           fi
-          gh release create "$GITHUB_REF_NAME" "${files[@]}" --repo "$GITHUB_REPOSITORY" --verify-tag \
-            --title "$GITHUB_REF_NAME" --generate-notes --notes "Docker: \`$IMAGE:$VERSION\` (also \`:latest\`)"
+          flags=() also=latest
+          # A pre-release does not become the repository's latest release
+          if [[ "$PRERELEASE" == true ]]; then flags+=(--prerelease); also=next; fi
+          gh release create "$GITHUB_REF_NAME" "${files[@]}" "${flags[@]}" --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "$GITHUB_REF_NAME" --generate-notes --notes "Docker: \`$IMAGE:$VERSION\` (also \`:$also\`)"

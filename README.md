@@ -16,6 +16,7 @@ Raspberry Pi.
 | Run | Image tags | GitHub release |
 |---|---|---|
 | tag `vX.Y.Z` pushed | `x.y.z`, `x.y`, `latest` | yes, with generated notes, after the image is out |
+| tag `vX.Y.Z-rc.N` pushed (any version with a `-`) | `x.y.z-rc.N`, `next` | yes, as a pre-release; the Docker Hub description stays |
 | run by hand on a branch | `edge` | no |
 
 On a tag, the tag must match the version in `package.json` (or `Cargo.toml`), otherwise nothing is
@@ -86,7 +87,8 @@ Actions cache written on tag `v1.2.3` can't be read on `v1.2.4` (only the same r
 branch are), so before, every release compiled everything again, and arm64, which nothing on `main`
 ever wrote, always did. The CI's image check shares the amd64 cache through
 [`actions/docker-build`](#docker-build-for-the-ci).
-Output: `version`, the published `x.y.z` (empty for `edge`).
+Outputs: `version`, the published `x.y.z` or `x.y.z-rc.N` (empty for `edge`), and `prerelease`
+(`'true'` for a version with a `-`).
 
 ### Examples
 
@@ -120,7 +122,8 @@ jobs:
 [`.github/workflows/tested-on-main.yml`](.github/workflows/tested-on-main.yml) tells a release
 whether `main`'s CI already tested the code, so it doesn't run the whole CI again before building.
 A release commit from *Bump version* changes only version numbers (and starts no CI), so the green
-push runs of the commit before it count; any other commit needs green push runs of its own.
+push runs of the commit before it count, also over several release commits in a row (`1.3.0-rc.1`,
+then `1.3.0`); any other commit needs green push runs of its own.
 
 ```yaml
 jobs:
@@ -347,7 +350,7 @@ on:
     inputs:
       bump:
         type: choice
-        options: [patch, minor, major]
+        options: [patch, minor, major]   # add prepatch, preminor, premajor, prerelease for pre-releases
         default: patch
 
 jobs:
@@ -362,7 +365,9 @@ jobs:
 
 | Input | Default | |
 |---|---|---|
-| `bump` | `patch` | `patch`, `minor` or `major`; `patch` on `1.2.0-rc.1` gives `1.2.0` |
+| `bump` | `patch` | `patch`, `minor` or `major`; `patch` on `1.2.0-rc.1` gives `1.2.0`. Pre-releases (need a version file): `prepatch`, `preminor`, `premajor` (`1.2.0` → `1.3.0-rc.1`), `prerelease` (`1.3.0-rc.1` → `1.3.0-rc.2`) |
+| `preid` | `rc` | identifier of a pre-release, e.g. `beta` |
+| `freeze-prerelease` | `false` | the release of a pre-release (`patch` on `1.3.0-rc.2`) fails when more than version numbers changed since the tag `v1.3.0-rc.2`; anything merged since goes out as another pre-release first |
 | `version-file` | `package.json` | `package.json`, `Cargo.toml` (also `[workspace.package]`) or a Kodi `addon.xml`; `""`: the tag alone is the version (see below) |
 | `extra-files` | `""` | further files with the same version, one per line, e.g. `src-tauri/tauri.conf.json` |
 | `tag-prefix` | `v` | |
@@ -370,6 +375,13 @@ jobs:
 
 A `package-lock.json` next to a `package.json` and a `Cargo.lock` next to a `Cargo.toml` (the
 workspace's own crates) are updated along with it. Outputs: `version`, `tag`.
+
+**Release candidates** on the default branch, no extra branch: `preminor` tags `v1.3.0-rc.1` and
+the [Docker release](#docker-release) pushes `:next`, while `:latest` stays on `1.2.x`; fixes go
+out as `prerelease` (`v1.3.0-rc.2`), and `patch` finally releases `v1.3.0`. With
+`freeze-prerelease: true` that last step only goes through when nothing but the fixes already in a
+pre-release landed in between. The numbering starts at `.1`; `npm version preminor --preid rc` on a
+checkout would start at `.0`.
 
 **Without a version file** (`version-file: ""`, e.g. snapraid-ui, or the Kodi add-on whose
 `addon.xml` gets the version at build time) the highest `vX.Y.Z` tag is raised and the current
