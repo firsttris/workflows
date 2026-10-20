@@ -11,6 +11,9 @@ name: Docker release
 # repositories, much faster than QEMU, which matters for compiled languages like Rust). A merge job
 # then joins the per-platform images into one multi-arch tag.
 #
+# A project with a second image (e.g. a backup sidecar) calls this once more with its own image and
+# ghcr-image, and github-release: false so only one call creates the release.
+#
 # The build cache lives in the registry (ghcr.io/<owner>/<repo>-buildcache:<platform>), not in the
 # Actions cache: an Actions cache written on tag v1.2.3 can't be read on tag v1.2.4 (only caches of
 # the same ref or the default branch are), so every release built from scratch. A registry cache is
@@ -42,11 +45,15 @@ on:
         type: boolean
         default: true
       ghcr:
-        description: Also push to ghcr.io/<owner>/<repo>
+        description: Also push to ghcr.io/<owner>/<repo> (or ghcr-image)
         type: boolean
         default: false
+      ghcr-image:
+        description: GHCR image without ghcr.io/, e.g. firsttris/haben-backup for a second image of the repository; empty is <owner>/<repo>
+        type: string
+        default: ""
       cache:
-        description: Keep the build cache in ghcr.io/<owner>/<repo>-buildcache (needs packages write)
+        description: Keep the build cache in ghcr.io/<ghcr image>-buildcache (needs packages write)
         type: boolean
         default: true
       version-file:
@@ -61,6 +68,10 @@ on:
         description: Name of an artifact uploaded earlier in the calling run; its files are attached to the GitHub release
         type: string
         default: ""
+      github-release:
+        description: Create the GitHub release on a version tag; false for a second image of the same release
+        type: boolean
+        default: true
       dockerhub-user:
         type: string
         default: tristanteu
@@ -128,6 +139,7 @@ jobs:
           NATIVE: ${{ inputs.native-runners }}
           IMAGE: ${{ inputs.image }}
           GHCR: ${{ inputs.ghcr }}
+          GHCR_IMAGE: ${{ inputs.ghcr-image }}
         shell: python
         run: |
           import json, os
@@ -143,12 +155,14 @@ jobs:
                   "qemu": platform != "linux/amd64" and not (arm64 and native),
               })
           names = [os.environ["IMAGE"]]
+          # A second image of the repository needs its own name and cache, or it overwrites the first
+          ghcr = "ghcr.io/" + (os.environ["GHCR_IMAGE"] or os.environ["GITHUB_REPOSITORY"]).lower()
           if os.environ["GHCR"] == "true":
-              names.append("ghcr.io/" + os.environ["GITHUB_REPOSITORY"].lower())
+              names.append(ghcr)
           with open(os.environ["GITHUB_OUTPUT"], "a") as out:
               out.write(f"matrix={json.dumps({'include': matrix})}\n")
               out.write(f"names={','.join(names)}\n")
-              out.write(f"cache=ghcr.io/{os.environ['GITHUB_REPOSITORY'].lower()}-buildcache\n")
+              out.write(f"cache={ghcr}-buildcache\n")
 
   build:
     name: Build ${{ matrix.platform }}
@@ -311,7 +325,7 @@ jobs:
 
   github-release:
     needs: [prepare, merge]
-    if: needs.prepare.outputs.version != ''
+    if: needs.prepare.outputs.version != '' && inputs.github-release
     runs-on: ubuntu-latest
     permissions:
       contents: write
