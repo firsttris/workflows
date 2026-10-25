@@ -12,6 +12,9 @@ Rules, taken from the best READMEs (quadeck, haul, fernsicht, snapraid-ui, vscod
 - Show it: a banner or screenshot right under the badges, from "Update screenshots", never older
   than the UI. Every image has an alt text that describes what is on it, with the keywords.
 - Install in under a minute: the shortest working command near the top.
+- Or let an agent do it: "Let an AI agent set it up" under Install, a prompt to paste into any
+  coding agent. Neutral wording, Claude Code only as one example; the prompt points to the
+  installation page of the documentation, so that page has to hold every step.
 - Why before what: three or four bullets on the problem it solves, then the features.
 - Benefits, not internals: "one binary, no container" rather than the module list. Numbers where
   they exist (latency, size, sites supported).
@@ -83,6 +86,26 @@ script. Store projects use the large "Add to Chrome / Firefox / Edge" badges.>
 
 <One line on what happens next ("open http://<host>:8080 and set your password").> Everything else
 is in the [installation guide](https://firsttris.github.io/<repo>/installation.html).
+
+### 🤖 Let an AI agent set it up
+
+Start an AI coding agent such as [Claude Code](https://code.claude.com/docs), Codex or Gemini CLI
+on <the server / the computer> and paste:
+
+```text
+Install <Name> on this machine with <Podman Quadlet / Docker Compose / the .deb>, following
+https://firsttris.github.io/<repo>/installation.html. <What it finds out itself: a free port,
+the data folder, the GPU, the MQTT broker>. Show me each file before you write it and ask me
+for <the domain, passwords>.
+```
+
+It <checks the requirements, writes the files, starts it and checks that it answers>. <What it
+can do afterwards, if anything: the CLI, the MCP server, the config file; link the section that
+explains it.>
+
+<!-- Drop this for things an agent cannot install (store extensions, a public website). Where the
+     project has more for agents (MCP server, CLI, skill), keep that in its own "## 🤖" section and
+     only link it here. -->
 
 <!-- Optional: "### 🐧 Runs on" as a table of distributions, devices or versions with ✅ / ⚠️ -->
 
