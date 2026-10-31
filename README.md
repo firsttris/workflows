@@ -307,10 +307,10 @@ Every project's `.github/renovate.json5` (the Renovate GitHub App) starts from t
 | Lock file maintenance (the indirect dependencies) | on the 1st of the month | by Renovate, once CI is green |
 | 0.x minor updates (may break) | on the 1st of the month, one pull request | by a person |
 | Major updates: one pull request for the packages, one for the workflows (actions, runner images) | when ticked in the project's Dependency Dashboard issue | by a person |
-| Security fixes | at once | by a person |
+| Security fixes | after one day (pnpm refuses younger packages) | by a person |
 | What the project builds on (its own rules) | at once, one pull request per upstream with a checklist | by a person |
 
-A release is taken only after three days. At most five Renovate pull requests are open per project and two new ones come an hour, and a branch is rebased only when it conflicts, so the CI is not flooded. A project's own rules (an engine, SnapRAID, ESPHome, Bun,
+A release is taken only after three days, a security fix after one day. At most five Renovate pull requests are open per project and two new ones come an hour, and a branch is rebased only when it conflicts, so the CI is not flooded. A project's own rules (an engine, SnapRAID, ESPHome, Bun,
 Tauri, ...) come after the shared ones and win; each sets its own `groupName`,
 `schedule: ["at any time"]`, `automerge: false` and `dependencyDashboardApproval: false`, so that
 upstream keeps its own pull request, majors included. A project whose pull requests run no CI also

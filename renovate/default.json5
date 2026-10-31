@@ -7,8 +7,9 @@
 //   updates once a month in one pull request per project, merged by Renovate itself once CI is
 //   green; lock file maintenance in the same window.
 // - Major updates only on request: they wait in the Dependency Dashboard issue until ticked.
-// - Security fixes at once, outside the schedule, not merged by themselves.
+// - Security fixes after one day, outside the schedule, not merged by themselves.
 // - A release is taken only after three days (most broken or hijacked releases are pulled by then).
+//   Never less than one day: pnpm 12 refuses packages younger than that (see below).
 // - A project's rule for what it builds on sets its own groupName, `schedule: ["at any time"]` and
 //   `automerge: false`, so that upstream keeps its own pull request with its checklist.
 // - A project whose pull requests run no CI sets `automerge: false` and
@@ -18,6 +19,12 @@
   extends: ["config:recommended", ":dependencyDashboard"],
   timezone: "Europe/Berlin",
   labels: ["dependencies"],
+  // pnpm 12 refuses to install a package younger than one day (its minimumReleaseAge
+  // defaults to 1440 minutes, and it checks every entry of an existing lock file as well):
+  // a pull request that brings a younger one fails with ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION.
+  // So no rule here or in a project goes below one day for npm packages. Lock file maintenance
+  // takes no minimumReleaseAge from Renovate (it rewrites the whole lock file); there pnpm 12
+  // itself resolves to releases older than a day, so its lock files pass the check as well.
   minimumReleaseAge: "3 days",
   // Many images (ghcr.io, the Docker Hub tags) carry no release date; without this they would wait
   // in "Pending Status Checks" for good instead of coming as a pull request
@@ -44,7 +51,9 @@
     enabled: true,
     labels: ["dependencies", "security"],
     schedule: ["at any time"],
-    minimumReleaseAge: null,
+    // One day, not at once: pnpm would refuse a fix younger than that (see minimumReleaseAge),
+    // and Renovate appends these rules after packageRules, so it has to be set here
+    minimumReleaseAge: "1 day",
     automerge: false,
   },
   packageRules: [
