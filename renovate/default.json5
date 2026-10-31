@@ -1,0 +1,72 @@
+// The shared Renovate settings of every project (Renovate GitHub App). A project takes them with
+//   extends: ["github>firsttris/workflows//renovate/default.json5"]
+// and adds its own rules for what it builds on (an engine, SnapRAID, ESPHome, Bun, Tauri, ...);
+// its rules come after these and win. See "Renovate" in the README.
+//
+// - The ordinary packages (npm/Bun, Cargo, pip, Go, Deno, actions, images): minor and patch
+//   updates once a month in one pull request per project, merged by Renovate itself once CI is
+//   green; lock file maintenance in the same window.
+// - Major updates only on request: they wait in the Dependency Dashboard issue until ticked.
+// - Security fixes at once, outside the schedule, not merged by themselves.
+// - A release is taken only after three days (most broken or hijacked releases are pulled by then).
+// - A project's rule for what it builds on sets its own groupName, `schedule: ["at any time"]` and
+//   `automerge: false`, so that upstream keeps its own pull request with its checklist.
+// - A project whose pull requests run no CI sets `automerge: false` and
+//   `lockFileMaintenance: { automerge: false }`: without checks nothing would stop a merge.
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  extends: ["config:recommended", ":dependencyDashboard"],
+  timezone: "Europe/Berlin",
+  labels: ["dependencies"],
+  minimumReleaseAge: "3 days",
+  internalChecksFilter: "strict",
+  // Renovate merges itself once the checks pass; GitHub's auto-merge is off in most repositories
+  platformAutomerge: false,
+  automergeType: "pr",
+  // The helper workflows of some projects (engine-pin.yml, renovate-flatpak.yml, ...) commit a hash
+  // or regenerated sources on Renovate's branch as github-actions[bot]; that keeps it Renovate's
+  // branch, so it is still rebased and merged
+  gitIgnoredAuthors: ["41898282+github-actions[bot]@users.noreply.github.com"],
+  prConcurrentLimit: 10,
+  prHourlyLimit: 0,
+  lockFileMaintenance: {
+    enabled: true,
+    schedule: ["* 0-5 1 * *"],
+    automerge: true,
+  },
+  vulnerabilityAlerts: {
+    enabled: true,
+    labels: ["dependencies", "security"],
+    schedule: ["at any time"],
+    minimumReleaseAge: null,
+    automerge: false,
+  },
+  packageRules: [
+    {
+      // The ordinary packages: one PR a month, merged once CI is green
+      matchUpdateTypes: ["minor", "patch", "pin", "digest"],
+      groupName: "dependencies (minor and patch)",
+      groupSlug: "minor-patch",
+      schedule: ["* 0-5 1 * *"],
+      automerge: true,
+    },
+    {
+      // 0.x: a minor may break (semver), so these come in a PR of their own that waits for a person
+      matchUpdateTypes: ["minor"],
+      matchCurrentVersion: "/^v?0\\./",
+      groupName: "dependencies (0.x minor)",
+      groupSlug: "zero-minor",
+      automerge: false,
+    },
+    {
+      matchUpdateTypes: ["major"],
+      dependencyDashboardApproval: true,
+      automerge: false,
+    },
+    {
+      // The shared workflows and actions, moved by this repository's move-tag.yml
+      matchPackageNames: ["firsttris/workflows", "firsttris/workflows/**"],
+      enabled: false,
+    },
+  ],
+}

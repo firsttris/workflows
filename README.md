@@ -288,6 +288,38 @@ Homematic und Homematic IP sind Marken der eQ-3 AG. Dieses Projekt steht in kein
 - With issue templates the links open them directly (`issues/new?template=bug_report.md`).
 - The empty lines inside the `<div>` matter: without them GitHub does not render the Markdown links.
 
+## Renovate in every project
+
+Every project's `.github/renovate.json5` (the Renovate GitHub App) starts from the shared settings in
+[`renovate/default.json5`](renovate/default.json5):
+
+```json5
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  extends: ["github>firsttris/workflows//renovate/default.json5"],
+  packageRules: [ /* what the project builds on */ ],
+}
+```
+
+| What | When | Merged |
+|---|---|---|
+| Ordinary packages (npm/Bun, Cargo, pip, Go, Deno, actions, images), minor and patch | on the 1st of the month, one pull request per project | by Renovate, once CI is green |
+| Lock file maintenance (the indirect dependencies) | on the 1st of the month | by Renovate, once CI is green |
+| 0.x minor updates (may break) | on the 1st of the month, one pull request | by a person |
+| Major updates | when ticked in the project's Dependency Dashboard issue | by a person |
+| Security fixes | at once | by a person |
+| What the project builds on (its own rules) | at once, one pull request per upstream with a checklist | by a person |
+
+A release is taken only after three days. A project's own rules (an engine, SnapRAID, ESPHome, Bun,
+Tauri, ...) come after the shared ones and win; each sets its own `groupName`,
+`schedule: ["at any time"]`, `automerge: false` and `dependencyDashboardApproval: false`, so that
+upstream keeps its own pull request, majors included. A project whose pull requests run no CI also
+sets `automerge: false` and `lockFileMaintenance: { automerge: false }`.
+
+Everything open across the projects: the pull requests with the label `dependencies`
+(`is:pr is:open label:dependencies user:firsttris`). A change here applies to every project with
+Renovate's next run; no tag needs to move.
+
 ## Tech stack
 
 [`tech-stack.md`](tech-stack.md) lists the technologies the projects use and which one is
