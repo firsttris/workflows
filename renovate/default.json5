@@ -23,6 +23,10 @@
   // Renovate merges itself once the checks pass; GitHub's auto-merge is off in most repositories
   platformAutomerge: false,
   automergeType: "pr",
+  // The helper workflows of some projects (engine-pin.yml, renovate-flatpak.yml, ...) commit a hash
+  // or regenerated sources on Renovate's branch as github-actions[bot]; that keeps it Renovate's
+  // branch, so it is still rebased and merged
+  gitIgnoredAuthors: ["41898282+github-actions[bot]@users.noreply.github.com"],
   prConcurrentLimit: 10,
   prHourlyLimit: 0,
   lockFileMaintenance: {
