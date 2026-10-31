@@ -306,7 +306,7 @@ Every project's `.github/renovate.json5` (the Renovate GitHub App) starts from t
 | Ordinary packages (npm/Bun, Cargo, pip, Go, Deno, actions, images), minor and patch | on the 1st of the month, one pull request per project | by Renovate, once CI is green |
 | Lock file maintenance (the indirect dependencies) | on the 1st of the month | by Renovate, once CI is green |
 | 0.x minor updates (may break) | on the 1st of the month, one pull request | by a person |
-| Major updates (those of the workflows, actions and runner images, together in one pull request) | when ticked in the project's Dependency Dashboard issue | by a person |
+| Major updates: one pull request for the packages, one for the workflows (actions, runner images) | when ticked in the project's Dependency Dashboard issue | by a person |
 | Security fixes | at once | by a person |
 | What the project builds on (its own rules) | at once, one pull request per upstream with a checklist | by a person |
 

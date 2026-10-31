@@ -70,12 +70,19 @@
       automerge: false,
     },
     {
+      // The majors of the ordinary packages in one pull request too, opened when ticked: one CI run
+      // and one place to fix what breaks (a project's own rules keep theirs apart)
+      matchUpdateTypes: ["major"],
+      groupName: "dependencies (major)",
+      groupSlug: "packages",
+    },
+    {
       // The majors of the workflows (actions, runner images, setup-* versions) in one pull request:
       // they rarely break and are checked by one CI run together
       matchManagers: ["github-actions"],
       matchUpdateTypes: ["major"],
       groupName: "GitHub Actions (major)",
-      groupSlug: "actions-major",
+      groupSlug: "actions",
     },
     {
       // The shared workflows and actions, moved by this repository's move-tag.yml
