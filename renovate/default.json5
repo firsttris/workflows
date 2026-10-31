@@ -19,6 +19,9 @@
   timezone: "Europe/Berlin",
   labels: ["dependencies"],
   minimumReleaseAge: "3 days",
+  // Many images (ghcr.io, the Docker Hub tags) carry no release date; without this they would wait
+  // in "Pending Status Checks" for good instead of coming as a pull request
+  minimumReleaseAgeBehaviour: "timestamp-optional",
   internalChecksFilter: "strict",
   // Renovate merges itself once the checks pass; GitHub's auto-merge is off in most repositories
   platformAutomerge: false,
