@@ -15,7 +15,7 @@ jobs:
   actionlint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: actionlint
         env:
           ACTIONLINT_VERSION: 1.7.7
@@ -32,7 +32,7 @@ jobs:
     steps:
       - id: image
         run: echo "image=$ImageVersion" >> "$GITHUB_OUTPUT"
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - id: first
         uses: ./actions/apt-install
         with:
@@ -44,7 +44,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - id: second
         uses: ./actions/apt-install
         with:

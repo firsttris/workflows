@@ -81,7 +81,7 @@ jobs:
     if: inputs.chrome
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: ${{ inputs.artifact }}
       - name: Upload to Chrome Web Store
@@ -100,8 +100,8 @@ jobs:
     if: inputs.firefox
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           name: ${{ inputs.artifact }}
           path: ${{ runner.temp }}/extension
@@ -125,7 +125,7 @@ jobs:
     if: inputs.edge
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: ${{ inputs.artifact }}
       - name: Publish to Microsoft Edge Add-ons
