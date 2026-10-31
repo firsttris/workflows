@@ -17,8 +17,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: actionlint
+        env:
+          ACTIONLINT_VERSION: 1.7.7
         run: |
-          bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.7/scripts/download-actionlint.bash) 1.7.7
+          bash <(curl -fsSL "https://raw.githubusercontent.com/rhysd/actionlint/v${ACTIONLINT_VERSION}/scripts/download-actionlint.bash") "$ACTIONLINT_VERSION"
           ./actionlint -color
 
   # The apt-install action itself: a first install fills the cache, a second job takes it from there
