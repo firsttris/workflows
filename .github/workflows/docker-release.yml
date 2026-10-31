@@ -98,7 +98,7 @@ jobs:
       cache: ${{ steps.plan.outputs.cache }}
       artifact: ${{ steps.plan.outputs.artifact }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - id: version
         name: Version
@@ -179,24 +179,24 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - if: matrix.qemu
-        uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
+        uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
       - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ inputs.dockerhub-user }}
           password: ${{ secrets.DOCKER_PAT }}
       - name: Log in to GHCR
         if: inputs.ghcr || inputs.cache
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ needs.prepare.outputs.names }}
       # The registry cache, and the Actions cache of the default branch as before (the CI's image
@@ -220,7 +220,7 @@ jobs:
 
       # Pushed by digest only; the merge job puts the tags on the multi-arch list.
       - id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ${{ inputs.context }}
           file: ${{ inputs.dockerfile }}
@@ -235,7 +235,7 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/digests"
           touch "$RUNNER_TEMP/digests/${DIGEST#sha256:}"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ needs.prepare.outputs.artifact }}${{ matrix.pair }}
           path: ${{ runner.temp }}/digests/*
@@ -250,26 +250,26 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: ${{ runner.temp }}/digests
           pattern: ${{ needs.prepare.outputs.artifact }}*
           merge-multiple: true
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
       - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ inputs.dockerhub-user }}
           password: ${{ secrets.DOCKER_PAT }}
       - name: Log in to GHCR
         if: inputs.ghcr
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ needs.prepare.outputs.names }}
           tags: |
@@ -293,7 +293,7 @@ jobs:
         run: docker buildx imagetools inspect "$IMAGE:$TAG"
 
       # A pre-release keeps the description of the last release
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         if: inputs.readme != '' && needs.prepare.outputs.prerelease != 'true'
       - name: README for Docker Hub
         if: inputs.readme != '' && needs.prepare.outputs.prerelease != 'true'
@@ -336,7 +336,7 @@ jobs:
     steps:
       - name: Release files
         if: inputs.release-artifact != ''
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ${{ inputs.release-artifact }}
           path: release-files

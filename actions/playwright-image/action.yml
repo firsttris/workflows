@@ -22,7 +22,7 @@ runs:
   steps:
     # Only the lockfile, when the job hasn't checked out the repository itself
     - if: hashFiles(inputs.lockfile) == ''
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with:
         sparse-checkout: ${{ inputs.lockfile }}
         sparse-checkout-cone-mode: false
