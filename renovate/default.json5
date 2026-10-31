@@ -30,8 +30,11 @@
   // or regenerated sources on Renovate's branch as github-actions[bot]; that keeps it Renovate's
   // branch, so it is still rebased and merged
   gitIgnoredAuthors: ["41898282+github-actions[bot]@users.noreply.github.com"],
-  prConcurrentLimit: 10,
-  prHourlyLimit: 0,
+  // Every pull request runs the whole CI (some with e2e shards): at most five open, two new ones an
+  // hour, and a branch is rebased only when it conflicts, not on every push to main
+  prConcurrentLimit: 5,
+  prHourlyLimit: 2,
+  rebaseWhen: "conflicted",
   lockFileMaintenance: {
     enabled: true,
     schedule: ["* 0-5 1 * *"],
@@ -65,6 +68,14 @@
       matchUpdateTypes: ["major"],
       dependencyDashboardApproval: true,
       automerge: false,
+    },
+    {
+      // The majors of the workflows (actions, runner images, setup-* versions) in one pull request:
+      // they rarely break and are checked by one CI run together
+      matchManagers: ["github-actions"],
+      matchUpdateTypes: ["major"],
+      groupName: "GitHub Actions (major)",
+      groupSlug: "actions-major",
     },
     {
       // The shared workflows and actions, moved by this repository's move-tag.yml
