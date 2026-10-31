@@ -8,11 +8,10 @@
 // Check with `npx --package renovate renovate-config-validator .github/renovate.json5`.
 {
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
-  extends: ["config:recommended"],
+  // The shared settings of every project (renovate/default.json5); this repository's own pins are
+  // what every project runs, so each keeps its own pull request (the rules below)
+  extends: ["local>firsttris/workflows//renovate/default.json5"],
   enabledManagers: ["github-actions", "custom.regex"],
-  timezone: "Europe/Berlin",
-  labels: ["dependencies"],
-  automerge: false,
   customManagers: [
     {
       // ACTIONLINT_VERSION in the lint job (the download script and the binary of that tag)
@@ -45,6 +44,9 @@
       prBodyNotes: [
         "Every project uses these workflows through `@v1`. Before merging: read the release notes of each major (inputs renamed or removed, a new Node runtime of the action); `docker/*` and `actions/upload-artifact`/`download-artifact` must stay on matching majors (the digest artifacts of `docker-release.yml`). The lint job runs actionlint and the apt-install cache test. After merging: try one caller (a docker release with `edge`, a screenshots run), then run **Actions → Move major tag** so the projects get it; a change that breaks callers needs a `v2` instead.",
       ],
+      schedule: ["at any time"],
+      automerge: false,
+      dependencyDashboardApproval: false,
     },
     {
       matchPackageNames: ["rhysd/actionlint"],
@@ -52,6 +54,10 @@
       prBodyNotes: [
         "A new actionlint may find new problems in the workflows; the lint job of this PR shows them.",
       ],
+      groupName: "actionlint",
+      schedule: ["at any time"],
+      automerge: false,
+      dependencyDashboardApproval: false,
     },
     {
       // The Node of the publish job (setup-node's node-version, vsce and ovsx need >= 22) and the
@@ -61,6 +67,9 @@
       prBodyNotes: [
         "Used by `vscode-extension-publish.yml` only; nothing here runs it before a release. Before merging: read the changelogs of vsce and ovsx (`publish --packagePath`, `--skip-duplicate`); check their `engines.node` against `node-version`. After merging: Move major tag, and watch the next extension release (vscode-jest-runner).",
       ],
+      schedule: ["at any time"],
+      automerge: false,
+      dependencyDashboardApproval: false,
     },
   ],
 }
