@@ -7,7 +7,9 @@
 //   updates once a month in one pull request per project, merged by Renovate itself once CI is
 //   green; lock file maintenance in the same window.
 // - Major updates only on request: they wait in the Dependency Dashboard issue until ticked.
-// - Security fixes after one day, outside the schedule, not merged by themselves.
+// - Security fixes after one day, outside the schedule, not merged by themselves. They come from
+//   the repository's Dependabot alerts (must be on: Settings → Code security, or account-wide at
+//   github.com/settings/security_analysis) and from the OSV database (osvVulnerabilityAlerts).
 // - A release is taken only after three days (most broken or hijacked releases are pulled by then).
 //   Never less than one day: pnpm 12 refuses packages younger than that (see below).
 // - A project's rule for what it builds on sets its own groupName, `schedule: ["at any time"]` and
@@ -47,6 +49,11 @@
     schedule: ["* 0-5 1 * *"],
     automerge: true,
   },
+  // Renovate learns of a vulnerability from the repository's Dependabot alerts (GitHub only lists
+  // them when they are switched on) and, with this, from osv.dev itself: a second source that
+  // works without the alerts and the app's permission to read them. Both lead to the same pull
+  // request under the rules of vulnerabilityAlerts below.
+  osvVulnerabilityAlerts: true,
   vulnerabilityAlerts: {
     enabled: true,
     labels: ["dependencies", "security"],
