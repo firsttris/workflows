@@ -310,6 +310,13 @@ Every project's `.github/renovate.json5` (the Renovate GitHub App) starts from t
 | Security fixes | after one day (pnpm refuses younger packages) | by a person |
 | What the project builds on (its own rules) | at once, one pull request per upstream with a checklist | by a person |
 
+Renovate learns of a security fix from the repository's **Dependabot alerts** and from the
+[OSV database](https://osv.dev) (`osvVulnerabilityAlerts`). The alerts must be switched on in every
+repository (only the alerts; Dependabot's own security updates stay off, Renovate opens the pull
+request): account-wide at <https://github.com/settings/security_analysis>, "Enable all" and
+"Automatically enable for new repositories". Without them a vulnerability shows up neither in the
+Security tab nor in an e-mail from GitHub; OSV still brings the pull request.
+
 A release is taken only after three days, a security fix after one day. At most five Renovate pull requests are open per project and two new ones come an hour, and a branch is rebased only when it conflicts, so the CI is not flooded. A project's own rules (an engine, SnapRAID, ESPHome, Bun,
 Tauri, ...) come after the shared ones and win; each sets its own `groupName`,
 `schedule: ["at any time"]`, `automerge: false` and `dependencyDashboardApproval: false`, so that
