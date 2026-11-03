@@ -87,7 +87,7 @@ As vscode-jest-runner does it:
 | CI and images | `oven-sh/setup-bun` with `bun-version-file: package.json`; build stages on `oven/bun` | no `setup-node` or `pnpm/action-setup`; in the Playwright image, which has Node but no `unzip` and no `jq`, `npm install --global "bun@$(node -p "require('./package.json').packageManager.split('@')[1]")"` instead of setup-bun |
 | Build | **Vite** | `Bun.build` for small scripts and plugins instead of `esbuild` |
 | Unit tests | **Vitest**; `cargo test`; `go test` | |
-| E2E and screenshots | **Playwright** in the official Playwright image, its runner on Bun too: `bun --bun playwright test` (as haben does) | screenshots via the "Update screenshots" workflow; Node only where a project has shown that a spec does not load under Bun, with the reason in its CLAUDE.md |
+| E2E and screenshots | **Playwright** in the official Playwright image, its runner on Bun too: `bun --bun playwright test` (as haben does) | screenshots via the "Update screenshots" workflow; under Bun, Playwright skips its own TypeScript loader, so the folder with the specs needs `"type": "module"` in its package.json (else Bun reads them as CommonJS and stops at type syntax) — in the test folder's own package.json when the root can't take it (ccu-addon-mui); Node only where a project has shown that a spec does not load under Bun, with the reason in its CLAUDE.md |
 
 ## Delivery
 
