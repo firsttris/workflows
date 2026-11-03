@@ -26,7 +26,7 @@ project's CLAUDE.md.
 | | Preferred | Also | Notes |
 |---|---|---|---|
 | Language | **TypeScript** when performance is no concern: one language front and back, shared types | **Rust** for performance, low latency, system and binary work; **Go** for small static binaries on devices (CCU) | |
-| Runtime (TypeScript) | **Bun** (one binary with `bun build --compile`) | Node (haben, gaiser-lager); Deno where it is already in use (snapraid-ui) | |
+| Runtime (TypeScript) | **Bun** (one binary with `bun build --compile`) | Node (gaiser-lager); Deno where it is already in use (snapraid-ui) | |
 | HTTP (TypeScript) | TanStack Start server routes and functions | **Hono** for a standalone API | |
 | HTTP (Rust) | **axum** on **tokio** | | `tracing` for logs, `thiserror` in libraries, `anyhow` in binaries, `serde`, `reqwest` |
 | Validation | **Zod** | | at every boundary: requests, config, files |
@@ -100,8 +100,8 @@ As vscode-jest-runner does it:
 
 To align when a project is touched anyway:
 
-- Formatter: ESLint in haben, ESLint and Prettier in prefixr, Prettier in fernsicht, none in
-  haul, ccu-addon-mui and gaiser-lager → Biome (quadeck has switched already).
+- Formatter: ESLint and Prettier in prefixr, Prettier in fernsicht, none in haul, ccu-addon-mui and
+  gaiser-lager, Biome only as linter in haben → Biome (quadeck has switched already).
 - Tailwind: haben and haul use their own CSS with CSS variables → Tailwind when the UI is reworked
   anyway.
 - Browser extensions: `haul/extension` is plain TypeScript with esbuild → Solid, Vite and
