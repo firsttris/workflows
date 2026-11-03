@@ -84,10 +84,10 @@ As vscode-jest-runner does it:
 | Type checking | TypeScript **strict** | `tsc --noEmit` in CI |
 | Package manager | **Bun**, also for workspaces (`workspaces` in package.json, `bun --filter`) | `bun.lock` checked in, `bun install --frozen-lockfile` in CI; the Bun version in `packageManager` (`bun@1.x.y`) |
 | Scripts and tools | **Bun** runs TypeScript directly: `bun scripts/x.ts`, `bunx` instead of `npx` | no `ts-node`, `tsx`, `nodemon` (`bun --watch`) or `dotenv` (Bun reads `.env`); a dev script that starts several processes (cargo and Vite) as `scripts/dev.ts` |
-| CI and images | `oven-sh/setup-bun` with `bun-version-file: package.json`; build stages on `oven/bun` | no `setup-node` or `pnpm/action-setup`; in the Playwright image, which has Node but no `unzip`, `npm install --global bun@…` instead of setup-bun |
+| CI and images | `oven-sh/setup-bun` with `bun-version-file: package.json`; build stages on `oven/bun` | no `setup-node` or `pnpm/action-setup`; in the Playwright image, which has Node but no `unzip` and no `jq`, `npm install --global "bun@$(node -p "require('./package.json').packageManager.split('@')[1]")"` instead of setup-bun |
 | Build | **Vite** | `Bun.build` for small scripts and plugins instead of `esbuild` |
 | Unit tests | **Vitest**; `cargo test`; `go test` | |
-| E2E and screenshots | **Playwright** in the official Playwright image | screenshots via the "Update screenshots" workflow |
+| E2E and screenshots | **Playwright** in the official Playwright image, its runner on Bun too: `bun --bun playwright test` (as haben does) | screenshots via the "Update screenshots" workflow; Node only where a project has shown that a spec does not load under Bun, with the reason in its CLAUDE.md |
 
 ## Delivery
 
