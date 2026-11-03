@@ -26,7 +26,7 @@ project's CLAUDE.md.
 | | Preferred | Also | Notes |
 |---|---|---|---|
 | Language | **TypeScript** when performance is no concern: one language front and back, shared types | **Rust** for performance, low latency, system and binary work; **Go** for small static binaries on devices (CCU) | |
-| Runtime (TypeScript) | **Bun** (one binary with `bun build --compile`) | Node (gaiser-lager); Deno where it is already in use (snapraid-ui) | |
+| Runtime (TypeScript) | **Bun** (one binary with `bun build --compile`) | | Node and Deno only where a project still has them (see the end), not for new code |
 | HTTP (TypeScript) | TanStack Start server routes and functions | **Hono** for a standalone API | |
 | HTTP (Rust) | **axum** on **tokio** | | `tracing` for logs, `thiserror` in libraries, `anyhow` in binaries, `serde`, `reqwest` |
 | Validation | **Zod** | | at every boundary: requests, config, files |
@@ -72,7 +72,7 @@ As vscode-jest-runner does it:
 | Build | TypeScript, **bundled with Vite** into one file; Biome; `tsc --noEmit` | |
 | Tests | Vitest for the logic, `@vscode/test-electron` for tests inside the editor | CI on Linux, Windows and macOS |
 | Release | `bump.yml` (the shared bump workflow) tags `vX.Y.Z`; `release.yml` on the tag runs the CI, which also builds the `.vsix`, then `github-release.yml` with the `.vsix` and `vscode-extension-publish.yml` to the Visual Studio Marketplace and Open VSX | [README](README.md#vs-code-extension-publish) |
-| Package manager | npm may stay here | `vsce` works best with it |
+| Package manager | **Bun**, as everywhere | the extension is bundled into one file, so `vsce package --no-dependencies` (it would otherwise call `npm list`); the tests inside the editor run in VS Code's own Electron, not in Bun |
 
 ## Tooling
 
@@ -82,8 +82,10 @@ As vscode-jest-runner does it:
 | Format and lint (Rust) | `cargo fmt`, `cargo clippy -D warnings` | |
 | Format and lint (Go) | `gofmt`, `go vet` | |
 | Type checking | TypeScript **strict** | `tsc --noEmit` in CI |
-| Package manager | **pnpm** (workspaces); **bun** where Bun is the runtime | lockfile checked in, `--frozen-lockfile` in CI |
-| Build | **Vite** | `esbuild` for small scripts and plugins |
+| Package manager | **Bun**, also for workspaces (`workspaces` in package.json, `bun --filter`) | `bun.lock` checked in, `bun install --frozen-lockfile` in CI; the Bun version in `packageManager` (`bun@1.x.y`) |
+| Scripts and tools | **Bun** runs TypeScript directly: `bun scripts/x.ts`, `bunx` instead of `npx` | no `ts-node`, `tsx`, `nodemon` (`bun --watch`) or `dotenv` (Bun reads `.env`); a dev script that starts several processes (cargo and Vite) as `scripts/dev.ts` |
+| CI and images | `oven-sh/setup-bun` with `bun-version-file: package.json`; build stages on `oven/bun` | no `setup-node` or `pnpm/action-setup`; in the Playwright image, which has Node but no `unzip`, `npm install --global bun@…` instead of setup-bun |
+| Build | **Vite** | `Bun.build` for small scripts and plugins instead of `esbuild` |
 | Unit tests | **Vitest**; `cargo test`; `go test` | |
 | E2E and screenshots | **Playwright** in the official Playwright image | screenshots via the "Update screenshots" workflow |
 
@@ -113,5 +115,18 @@ To align when a project is touched anyway:
 - Charts: Chart.js in snapraid-ui → uPlot when the project is touched anyway.
 - Desktop releases: fernsicht builds only the AppImage with its own script; a reusable Tauri release
   workflow (tauri-action, all platforms, updater) does not exist here yet.
-- Package manager: npm in snapraid-ui, ccu-addon-mui, reactive-volcano-app, the browser
-  extensions and gaiser-lager → pnpm.
+- Package manager and runtime → Bun:
+  - pnpm workspaces in windfenster, haul, stellwerk, spielstand, fernsicht, keybund and
+    pd200x-control (here Node only builds the frontend, so CI and the `node:` build stage of the
+    Dockerfile become Bun); haul's `esbuild` for plugins and extension → `Bun.build`; fernsicht's
+    CI still uses Node 22.
+  - npm in ccu-addon-mui, reactive-volcano-app, kachelwerk, Flugwetterdaten,
+    Gong-Second-Hand-Dashboard, the Astro sites (astro-cv, teufel-it-astro, ki-agent.ai;
+    `withastro/action` picks Bun from `bun.lock`), the browser extensions and the VS Code
+    extensions.
+  - snom-xml runs with `npx ts-node` and `dotenv` → `bun src/server.ts`; check the Windows service
+    of `node-windows` first.
+  - Node as runtime in gaiser-lager, Deno plus npm in snapraid-ui → Bun when the project is
+    touched anyway.
+  - Node stays where a tool needs it: prefixr generates a `package-lock.json` from `bun.lock` for
+    `flatpak-node-generator`; vscode-jest-runner tests with Jest, because it is a Jest runner.
