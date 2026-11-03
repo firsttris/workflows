@@ -126,7 +126,7 @@ To align when a project is touched anyway:
     extensions.
   - snom-xml runs with `npx ts-node` and `dotenv` → `bun src/server.ts`; check the Windows service
     of `node-windows` first.
-  - Node as runtime in gaiser-lager, Deno plus npm in snapraid-ui → Bun when the project is
-    touched anyway.
+  - Node as runtime in gaiser-lager → Bun when the project is touched anyway (snapraid-ui moved
+    from Deno to Bun; Deno's `--allow-*` flags were unscoped there and protected nothing).
   - Node stays where a tool needs it: prefixr generates a `package-lock.json` from `bun.lock` for
     `flatpak-node-generator`; vscode-jest-runner tests with Jest, because it is a Jest runner.
