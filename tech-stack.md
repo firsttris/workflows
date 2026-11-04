@@ -83,7 +83,7 @@ As vscode-jest-runner does it:
 | Format and lint (Go) | `gofmt`, `go vet` | |
 | Type checking | TypeScript **strict** | `tsc --noEmit` in CI |
 | Package manager | **Bun**, also for workspaces (`workspaces` in package.json, `bun --filter`) | `bun.lock` checked in, `bun install --frozen-lockfile` in CI; the Bun version in `packageManager` (`bun@1.x.y`) |
-| Scripts and tools | **Bun** runs TypeScript directly: `bun scripts/x.ts`, `bunx` instead of `npx` | no `ts-node`, `tsx`, `nodemon` (`bun --watch`) or `dotenv` (Bun reads `.env`); a dev script that starts several processes (cargo and Vite) as `scripts/dev.ts` |
+| Scripts and tools | **Bun** runs TypeScript directly: `bun scripts/x.ts`, `bunx` instead of `npx` | no `ts-node`, `tsx`, `nodemon` (`bun --watch`) or `dotenv` (Bun reads `.env`); several dev processes side by side (cargo and Vite) with `bun run --parallel dev:server dev:web`, preparation steps chained before it with `&&`; no own process supervisor (no `detached`, signal handlers or process groups): the terminal sends Ctrl+C, Ctrl+Z and hang-up to the whole process group by itself |
 | CI and images | `oven-sh/setup-bun` with `bun-version-file: package.json`; build stages on `oven/bun` | no `setup-node` or `pnpm/action-setup`; in the Playwright image, which has Node but no `unzip` and no `jq`, `npm install --global "bun@$(node -p "require('./package.json').packageManager.split('@')[1]")"` instead of setup-bun |
 | Build | **Vite** | `Bun.build` for small scripts and plugins instead of `esbuild` |
 | Unit tests | **Vitest**; `cargo test`; `go test` | |
