@@ -130,6 +130,59 @@ jobs:
                       blocks[i] = re.sub(rf'^version = "{re.escape(old)}"$', f'version = "{new}"', block, count=1, flags=re.M)
               path.write_text("\n[[package]]\n".join(blocks), encoding="utf-8")
 
+          # bun.lock is JSON with trailing commas: parsed only for the positions of its values, so the
+          # version is replaced in place and the rest of the file stays as Bun wrote it.
+          # Objects become {key: (value, start, end)}, other values their text span.
+          def jsonc(text, i=0):
+              ws = re.compile(r"\s*")
+              i = ws.match(text, i).end()
+              if text[i] == '"':
+                  end = re.compile(r'"(?:[^"\\]|\\.)*"').match(text, i).end()
+                  return json.loads(text[i:end]), end
+              if text[i] in "{[":
+                  close, members = "}" if text[i] == "{" else "]", {}
+                  i += 1
+                  while True:
+                      i = ws.match(text, i).end()
+                      if text[i] == ",":
+                          i += 1
+                          continue
+                      if text[i] == close:
+                          return members, i + 1
+                      if close == "}":
+                          key, i = jsonc(text, i)
+                          i = ws.match(text, i).end() + 1  # the colon
+                      start = ws.match(text, i).end()
+                      value, i = jsonc(text, start)
+                      if close == "}":
+                          members[key] = (value, start, i)
+              end = re.compile(r"[^,}\]\s]+").match(text, i).end()
+              return text[i:end], end
+
+          # A Bun workspace keeps each member's version in the bun.lock at the workspace root, under
+          # "workspaces" → the member's path relative to it ("" for the root package, which gets none)
+          def bun_lock(path):
+              repo = Path.cwd().resolve()
+              directory = path.resolve().parent
+              for d in [directory, *directory.parents]:
+                  if (d / "bun.lock").is_file():
+                      lock = d / "bun.lock"
+                      member = directory.relative_to(d).as_posix()
+                      return (lock.relative_to(repo) if lock.is_relative_to(repo) else lock), ("" if member == "." else member)
+                  if d == repo:
+                      return None, None
+              return None, None
+
+          def replace_bun_lock(path, member, new):
+              text = path.read_text(encoding="utf-8")
+              entry = jsonc(text)[0].get("workspaces", ({},))[0].get(member)
+              version = entry and isinstance(entry[0], dict) and entry[0].get("version")
+              if not version:
+                  return False
+              _, start, end = version
+              path.write_text(text[:start] + json.dumps(new) + text[end:], encoding="utf-8")
+              return True
+
           prefix = os.environ["TAG_PREFIX"]
           main = Path(os.environ["VERSION_FILE"]) if os.environ["VERSION_FILE"] else None
           extras = [Path(line.strip()) for line in os.environ["EXTRA_FILES"].splitlines() if line.strip()]
@@ -193,6 +246,10 @@ jobs:
               if lock and lock.is_file():
                   # The root entry and packages[""]
                   replace(lock, old, new, count=2)
+                  changed.append(lock)
+              lock, member = bun_lock(path) if path.name == "package.json" else (None, None)
+              # Also when the lock is still at an older version (an earlier bump without it)
+              if lock and replace_bun_lock(lock, member, new) and lock not in changed:
                   changed.append(lock)
               lock = path.with_name("Cargo.lock") if path.name == "Cargo.toml" else None
               if lock and lock.is_file():

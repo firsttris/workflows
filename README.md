@@ -415,7 +415,13 @@ jobs:
 | `release-workflow` | `release.yml` | started on the new tag; `""` starts nothing |
 
 A `package-lock.json` next to a `package.json` and a `Cargo.lock` next to a `Cargo.toml` (the
-workspace's own crates) are updated along with it. Outputs: `version`, `tag`.
+workspace's own crates) are updated along with it. In a Bun workspace the `bun.lock` in the
+`package.json`'s folder or the nearest one above it (up to the repository root) carries the version
+of a member, e.g. `apps/web/package.json` under `"workspaces"` → `"apps/web"`: that entry is updated
+too, so the next `bun install` changes nothing. The root package gets no version in `bun.lock`, so
+there the lock stays as it is. Outputs: `version`, `tag`.
+
+`tests/bump-version/test.sh` runs the step's Python on fixtures (in the Lint workflow).
 
 **Release candidates** on the default branch, no extra branch: `preminor` tags `v1.3.0-rc.1` and
 the [Docker release](#docker-release) pushes `:next`, while `:latest` stays on `1.2.x`; fixes go
