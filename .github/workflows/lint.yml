@@ -1,15 +1,18 @@
 name: Lint
 
-# Only the workflows are linted (and the apt-install action tried), so only a change to them runs it.
+# Only the workflows are linted (and the apt-install action and the bump script tried), so only a
+# change to them runs it.
 on:
   push:
     paths:
       - ".github/workflows/**"
       - "actions/**"
+      - "tests/**"
   pull_request:
     paths:
       - ".github/workflows/**"
       - "actions/**"
+      - "tests/**"
 
 jobs:
   actionlint:
@@ -22,6 +25,17 @@ jobs:
         run: |
           bash <(curl -fsSL "https://raw.githubusercontent.com/rhysd/actionlint/v${ACTIONLINT_VERSION}/scripts/download-actionlint.bash") "$ACTIONLINT_VERSION"
           ./actionlint -color
+
+  # The Python of bump-version.yml on fixtures: which version files and lock files it changes
+  bump-version:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+      - run: tests/bump-version/test.sh
 
   # The apt-install action itself: a first install fills the cache, a second job takes it from there
   apt-install:
