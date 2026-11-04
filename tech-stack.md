@@ -72,7 +72,7 @@ As vscode-jest-runner does it:
 | Build | TypeScript, **bundled with Vite** into one file; Biome; `tsc --noEmit` | |
 | Tests | Vitest for the logic, `@vscode/test-electron` for tests inside the editor | CI on Linux, Windows and macOS |
 | Release | `bump.yml` (the shared bump workflow) tags `vX.Y.Z`; `release.yml` on the tag runs the CI, which also builds the `.vsix`, then `github-release.yml` with the `.vsix` and `vscode-extension-publish.yml` to the Visual Studio Marketplace and Open VSX | [README](README.md#vs-code-extension-publish) |
-| Package manager | **Bun**, as everywhere | the extension is bundled into one file, so `vsce package --no-dependencies` (it would otherwise call `npm list`); the tests inside the editor run in VS Code's own Electron, not in Bun |
+| Package manager | **Bun**, as everywhere | the extension is bundled into one file, so `vsce package --no-dependencies` (it would otherwise call `npm list`), built in the `package` script because vsce runs `vscode:prepublish` through npm; the tests inside the editor run in VS Code's own Electron, not in Bun. Exception: **vscode-jest-runner** stays on npm and Node, because its tests run Jest on Node anyway — Bun only pays off where Node goes away |
 
 ## Tooling
 
