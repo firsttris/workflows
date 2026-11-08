@@ -7,6 +7,10 @@ name: Screenshots
 #
 # The caller is started by hand (workflow_dispatch) after a change to the look. A commit pushed
 # with the GITHUB_TOKEN starts no other workflow, so the pictures don't run the checks again.
+#
+# A branch behind a ruleset (pull request, status checks) refuses the GITHUB_TOKEN; the secret
+# deploy-key pushes with a deploy key on the ruleset's bypass list instead (as in bump-version.yml).
+# That push starts the branch's on: push workflows. The Playwright image brings openssh-client.
 on:
   workflow_call:
     inputs:
@@ -45,6 +49,10 @@ on:
         description: Name of that database
         type: string
         default: screenshots
+    secrets:
+      deploy-key:
+        description: Private SSH key of a deploy key with write access, for a branch whose ruleset lets deploy keys bypass it
+        required: false
 
 permissions:
   contents: read
@@ -87,6 +95,9 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v7
+        with:
+          # Empty: the GITHUB_TOKEN
+          ssh-key: ${{ secrets.deploy-key }}
 
       # The npm package brings the binary without curl or unzip, which the image lacks
       - name: Bun

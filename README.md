@@ -656,8 +656,13 @@ jobs:
 | `postgres` | `""` | Postgres image, e.g. `postgres:16`, for a database next to the job; its URL is in `$POSTGRES_URL` |
 | `postgres-db` | `screenshots` | name of that database |
 
+| Secret | |
+|---|---|
+| `deploy-key` | private key of a deploy key with write access, for a branch behind a ruleset; set up as for [Bump version](#bump-version) (the same key can serve both) |
+
 The command starts whatever the pictures need (a dev server, a production build with demo data, a
-mock) and stops it again. Like *Bump version*, the branch must accept pushes from GitHub Actions.
+mock) and stops it again. Like *Bump version*, the branch must accept pushes from GitHub Actions,
+or the push needs the deploy key; that commit then runs the branch's CI.
 
 ## Versions
 
