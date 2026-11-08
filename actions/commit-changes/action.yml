@@ -3,6 +3,7 @@ description: >-
   Commits what changed under the given paths (screenshots, baselines, generated files) as
   github-actions[bot] and pushes it to the branch the workflow runs on. Nothing changed: nothing
   is committed. The job needs contents: write; a push with the GITHUB_TOKEN starts no other workflow.
+  It pushes with whatever actions/checkout set up, e.g. its ssh-key for a deploy key.
 
 inputs:
   paths:
