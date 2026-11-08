@@ -12,6 +12,11 @@ name: Bump version
 # Without a version file (version-file: "") the tag alone is the version: the highest vX.Y.Z tag is
 # raised and the current commit tagged, nothing is committed.
 #
+# A branch protected by a ruleset (pull request, status checks) refuses the GITHUB_TOKEN, and the
+# token cannot be put on the ruleset's bypass list. A deploy key with write access can: the secret
+# deploy-key pushes with it. Such a push starts `on: push` workflows like a push from a checkout,
+# so the release workflow then starts on the tag by itself and is not started a second time.
+#
 # Pre-releases: preminor on 1.2.3 gives 1.3.0-rc.1 (prepatch and premajor alike), prerelease then
 # 1.3.0-rc.2, and patch the release 1.3.0.
 on:
@@ -40,6 +45,10 @@ on:
         description: Workflow file started on the new tag; empty starts nothing
         type: string
         default: release.yml
+    secrets:
+      deploy-key:
+        description: Private SSH key of a deploy key with write access, for a branch whose ruleset lets deploy keys bypass it
+        required: false
     outputs:
       version:
         description: The new version (x.y.z or x.y.z-rc.N)
@@ -70,6 +79,9 @@ jobs:
           fi
 
       - uses: actions/checkout@v7
+        with:
+          # Empty: the GITHUB_TOKEN
+          ssh-key: ${{ secrets.deploy-key }}
 
       - id: bump
         name: Raise the version
@@ -292,6 +304,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.bump.outputs.tag }}
           WORKFLOW: ${{ inputs.release-workflow }}
+          DEPLOY_KEY: ${{ secrets.deploy-key != '' }}
         run: |
+          if [[ "$DEPLOY_KEY" == true ]]; then
+            # The tag pushed with the deploy key has already started its on: push workflows
+            echo "Tagged $TAG; pushed with the deploy key, so [$WORKFLOW]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/workflows/$WORKFLOW) starts on it by itself" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           gh workflow run "$WORKFLOW" --repo "$GITHUB_REPOSITORY" --ref "$TAG"
           echo "Tagged $TAG and started [$WORKFLOW]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/workflows/$WORKFLOW) on it" >> "$GITHUB_STEP_SUMMARY"
