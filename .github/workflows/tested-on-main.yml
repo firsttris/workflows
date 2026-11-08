@@ -5,7 +5,8 @@ name: Tested on main
 # publishing.
 #
 # A release commit from "Bump version" changes only version numbers (and is pushed with the
-# GITHUB_TOKEN, which starts no CI), so the CI runs of the commit before it cover the code; several
+# GITHUB_TOKEN, which starts no CI; with a deploy key it does), so the CI runs of the commit before
+# it cover the code; several
 # release commits in a row without CI runs of their own (1.3.0-rc.1, then 1.3.0) are passed over
 # alike, a version-only commit with runs (a dependency bump) is not. Only
 # version numbers means: after replacing every x.y.z in the changed lines, the removed and the

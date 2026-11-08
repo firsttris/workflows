@@ -123,7 +123,8 @@ jobs:
 
 [`.github/workflows/tested-on-main.yml`](.github/workflows/tested-on-main.yml) tells a release
 whether `main`'s CI already tested the code, so it doesn't run the whole CI again before building.
-A release commit from *Bump version* changes only version numbers (and starts no CI), so the green
+A release commit from *Bump version* changes only version numbers (and starts no CI, unless pushed
+with a deploy key), so the green
 push runs of the commit before it count, also over several release commits in a row without CI runs
 of their own (`1.3.0-rc.1`, then `1.3.0`); any other commit needs green push runs of its own, even
 one that only bumps a dependency's version.
@@ -414,6 +415,10 @@ jobs:
 | `tag-prefix` | `v` | |
 | `release-workflow` | `release.yml` | started on the new tag; `""` starts nothing |
 
+| Secret | |
+|---|---|
+| `deploy-key` | private key of a deploy key with write access, for a branch behind a ruleset (see below); then the tag starts the release workflow by itself |
+
 A `package-lock.json` next to a `package.json` and a `Cargo.lock` next to a `Cargo.toml` (the
 workspace's own crates) are updated along with it. In a Bun workspace the `bun.lock` in the
 `package.json`'s folder or the nearest one above it (up to the repository root) carries the version
@@ -433,7 +438,26 @@ at `.1`; `npm version preminor --preid rc` on a checkout would start at `.0`.
 commit tagged; nothing is committed. Without any such tag the first one is `v0.0.1` (patch).
 
 The commit is pushed to the branch the workflow runs on, so that branch must accept pushes from
-GitHub Actions (no rule that requires a pull request for every change).
+GitHub Actions (no rule that requires a pull request for every change), or the push needs a deploy key.
+
+**Behind a ruleset** that asks for a pull request or status checks on the branch, the push with the
+`GITHUB_TOKEN` is refused (`GH013: Repository rule violations`), and the token cannot be put on the
+ruleset's bypass list. A deploy key can:
+
+1. `ssh-keygen -t ed25519 -N "" -C bump -f bump` on any machine.
+2. *Settings → Deploy keys → Add deploy key*: the content of `bump.pub`, *Allow write access*.
+3. *Settings → Secrets and variables → Actions*: a secret `BUMP_DEPLOY_KEY` with the content of `bump`.
+4. The ruleset's *Bypass list*: *Deploy keys*, *Always*. Then delete both files.
+5. In `bump.yml`, next to `with:`:
+
+   ```yaml
+       secrets:
+         deploy-key: ${{ secrets.BUMP_DEPLOY_KEY }}
+   ```
+
+A push with the deploy key starts `on: push` workflows like one from a checkout: the release
+workflow then starts on the tag by itself (it needs `on: push: tags`), and the release commit runs
+the CI on the branch.
 
 ## GitHub release
 
