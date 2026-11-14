@@ -16,6 +16,9 @@ inputs:
     required: true
   platform:
     default: linux/amd64
+  build-args:
+    description: Build arguments, one KEY=value per line; empty passes none
+    default: ""
 
 outputs:
   imageid:
@@ -49,6 +52,7 @@ runs:
         push: false
         load: true
         tags: ${{ inputs.tags }}
+        build-args: ${{ inputs.build-args }}
         cache-from: |
           type=registry,ref=${{ steps.cache.outputs.ref }}
           type=gha,scope=${{ steps.cache.outputs.pair }}
