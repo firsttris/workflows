@@ -75,6 +75,10 @@ on:
       dockerhub-user:
         type: string
         default: tristanteu
+      build-args:
+        description: Build arguments, one KEY=value per line, e.g. APP_COMMIT=<commit>; empty passes none
+        type: string
+        default: ""
     secrets:
       DOCKER_PAT:
         description: Docker Hub access token for dockerhub-user
@@ -226,6 +230,7 @@ jobs:
           file: ${{ inputs.dockerfile }}
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: ${{ inputs.build-args }}
           outputs: type=image,"name=${{ needs.prepare.outputs.names }}",push-by-digest=true,name-canonical=true,push=true
           cache-from: ${{ steps.cache.outputs.from }}
           cache-to: ${{ steps.cache.outputs.to }}

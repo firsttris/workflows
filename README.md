@@ -22,6 +22,11 @@ Raspberry Pi.
 On a tag, the tag must match the version in `package.json` (or `Cargo.toml`), otherwise nothing is
 published.
 
+`build-args` passes build arguments to the image, one `KEY=value` per line, e.g. the commit for an
+`ARG` in the Dockerfile (`build-args: APP_COMMIT=${{ github.sha }}`). `actions/docker-build` takes
+the same input. Put such an `ARG` after the expensive steps: a value that changes on every commit
+only rebuilds the layers after it.
+
 ### Usage
 
 `.github/workflows/release.yml` in a project:
