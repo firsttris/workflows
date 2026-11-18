@@ -1,0 +1,27 @@
+{
+  "name": "@firsttris/checks",
+  "version": "1.0.0",
+  "description": "Rule checks shared by the projects: file size, function length, page coverage, translations",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "checks": "checks/cli.ts"
+  },
+  "files": [
+    "checks",
+    "!checks/**/*.test.ts"
+  ],
+  "scripts": {
+    "test": "bun test checks",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check checks"
+  },
+  "dependencies": {
+    "oxc-parser": "^0.156.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.4",
+    "@types/bun": "^1.4.4",
+    "typescript": "^7.0.2"
+  }
+}

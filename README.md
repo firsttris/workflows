@@ -669,6 +669,79 @@ The command starts whatever the pictures need (a dev server, a production build 
 mock) and stops it again. Like *Bump version*, the branch must accept pushes from GitHub Actions,
 or the push needs the deploy key; that commit then runs the branch's CI.
 
+## Checks
+
+The rules every project writes into its CLAUDE.md (a file past ~400 lines and a function past ~80
+get split, every page in the accessibility test, every text translated), checked by one package
+instead of a copy per project: `@firsttris/checks` in [`checks/`](checks), run with Bun.
+
+| Command | Checks | Fails |
+|---|---|---|
+| `checks file-size` | files past `max` lines (400) that are not on the allowlist | yes |
+| `checks pages` | every page of the TanStack Router route tree is opened by the given spec files | yes |
+| `checks i18n` | Paraglide: every locale has the base locale's messages with the same placeholders, every message is used, no text a person reads in the code (JSX text, labels, German strings; `// i18n-ignore` for one that only looks like text) | yes |
+| `checks pr` | the branch against its base: a function new or grown past 80 lines, an allowlisted file grown by 20 lines or more, code without docs, a fix without a test | no, hints only |
+| `checks` | all of the first three that `checks.json` configures | |
+
+What was too long before the check stays allowed and listed in `.checks/` (`large-files.txt`,
+`pages.txt`, `texts.txt`): old files may grow but are split in a pull request of their own, a file's
+count of texts in the code may only go down. `--init` writes today's state into the list when a
+project takes up a check, `--clean` drops what is fixed since; the check says when to run it.
+
+### Usage
+
+```sh
+bun add -d github:firsttris/workflows#v1
+```
+
+`checks.json` in the project's root; only `include` is needed, the rest are defaults:
+
+```json
+{
+  "fileSize": { "include": ["src/**/*.{ts,tsx}", "server/**/*.ts", "crates/*/src/**/*.rs"] },
+  "pages": { "routeTree": "src/routeTree.gen.ts", "specs": ["e2e/accessibility.spec.ts"] },
+  "i18n": { "project": "project.inlang", "include": ["src/**/*.{ts,tsx}"] }
+}
+```
+
+- `fileSize`: `max` (400), `exclude` (tests, e2e, generated code, `paraglide/`), `allowlist`.
+  The functions are counted in the JavaScript and TypeScript files of the same globs (`functions`
+  with `max`, `include` and `exclude` for other ones).
+- `pages`: `ignore` (regular expressions, default `^/api/`), `exceptions`. A page left out on purpose
+  goes into `.checks/pages.txt` as `<spec> <page> <reason>`.
+- `i18n`: `exclude`, `allowlist`, `dynamicPrefixes` for keys built at run time (`server_${code}`).
+- `pr`: `docs` (`docs/**`), `tests`, `code` (the globs of `fileSize`), `grownLines` (20).
+
+In `package.json` and the CI:
+
+```json
+"lint": "biome check --error-on-warnings . && checks"
+```
+
+```yaml
+      # pull_request only, with fetch-depth: 0 at the checkout
+      - if: github.event_name == 'pull_request'
+        run: bun checks pr
+```
+
+Long functions also show in the editor through Biome, as a note that does not fail the CI, and in
+Rust through clippy:
+
+```jsonc
+// biome.json, linter.rules
+"complexity": {
+  "noExcessiveLinesPerFunction": { "level": "info", "options": { "maxLines": 80, "skipBlankLines": true } }
+}
+```
+
+```toml
+# clippy.toml; and in Cargo.toml [workspace.lints.clippy] too_many_lines = "warn"
+too-many-lines-threshold = 80
+```
+
+A change to `checks/` needs *Move major tag* like the workflows; the projects take it with
+`bun update @firsttris/checks` or with Renovate's lock file maintenance.
+
 ## Versions
 
 Callers pin `@v1`. After a compatible change, run *Move major tag* (Actions → Run workflow on
