@@ -680,11 +680,12 @@ instead of a copy per project: `@firsttris/checks` in [`checks/`](checks), run w
 | `checks file-size` | files past `max` lines (400) that are not on the allowlist | yes |
 | `checks pages` | every page of the TanStack Router route tree is opened by the given spec files | yes |
 | `checks i18n` | Paraglide: every locale has the base locale's messages with the same placeholders, every message is used, no text a person reads in the code (JSX text, labels, German strings; `// i18n-ignore` for one that only looks like text) | yes |
+| `checks cycles` | no ring of imports between modules, the folders `modules` names (`server/*`, `src/features/*`); rings inside a module do not count | yes |
 | `checks pr` | the branch against its base: a function new or grown past 80 lines, an allowlisted file grown by 20 lines or more, code without docs, a fix without a test | no, hints only |
-| `checks` | all of the first three that `checks.json` configures | |
+| `checks` | all of the above but `pr` that `checks.json` configures | |
 
 What was too long before the check stays allowed and listed in `.checks/` (`large-files.txt`,
-`pages.txt`, `texts.txt`): old files may grow but are split in a pull request of their own, a file's
+`pages.txt`, `texts.txt`, `cycles.txt`): old files may grow but are split in a pull request of their own, a file's
 count of texts in the code may only go down. `--init` writes today's state into the list when a
 project takes up a check, `--clean` drops what is fixed since; the check says when to run it.
 
@@ -710,6 +711,9 @@ bun add -d github:firsttris/workflows#v1
 - `pages`: `ignore` (regular expressions, default `^/api/`), `exceptions`. A page left out on purpose
   goes into `.checks/pages.txt` as `<spec> <page> <reason>`.
 - `i18n`: `exclude`, `allowlist`, `dynamicPrefixes` for keys built at run time (`server_${code}`).
+- `cycles`: `modules` (required), `aliases` such as `{ "@/": "src/" }` for the paths of tsconfig, `include`
+  (the TypeScript globs of `fileSize`), `exclude`, `allowlist`. Every import counts, type imports too;
+  imports into files outside every module (a shared `lib/`) are not followed.
 - `pr`: `docs` (`docs/**`), `tests`, `code` (the globs of `fileSize`), `grownLines` (20).
 
 In `package.json` and the CI:
