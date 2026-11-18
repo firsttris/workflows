@@ -35,7 +35,7 @@ Update what the change affects, in the same pull request, and only that:
 Green before every push, then check CI:
 
 ```sh
-<typecheck, lint/format, tests, build>
+<typecheck, lint/format (with `checks`, see "Checks" in firsttris/workflows), tests, build>
 mkdocs build --strict    # when docs/ or mkdocs.yml changed
 ```
 

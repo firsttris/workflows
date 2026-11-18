@@ -1,18 +1,24 @@
 name: Lint
 
-# Only the workflows are linted (and the apt-install action and the bump script tried), so only a
-# change to them runs it.
+# Only the workflows are linted (and the apt-install action, the bump script and the checks package
+# tried), so only a change to them runs it.
 on:
   push:
     paths:
       - ".github/workflows/**"
       - "actions/**"
       - "tests/**"
+      - "checks/**"
+      - "package.json"
+      - "bun.lock"
   pull_request:
     paths:
       - ".github/workflows/**"
       - "actions/**"
       - "tests/**"
+      - "checks/**"
+      - "package.json"
+      - "bun.lock"
 
 jobs:
   actionlint:
@@ -36,6 +42,20 @@ jobs:
         with:
           bun-version: 1.4.4
       - run: tests/bump-version/test.sh
+
+  # The checks package (README, "Checks"): its tests, types and lint
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+      - run: bun install --frozen-lockfile
+      - run: bun run test
+      - run: bun run typecheck
+      - run: bun run lint
 
   # The apt-install action itself: a first install fills the cache, a second job takes it from there
   apt-install:
