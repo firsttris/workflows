@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { parseArgs } from "node:util";
 import { loadConfig } from "./config.ts";
+import { runCycles } from "./cycles.ts";
 import { runFileSize } from "./file-size.ts";
 import { runI18n } from "./i18n.ts";
 import { runPages } from "./pages.ts";
@@ -11,13 +12,14 @@ import { runPr } from "./pr.ts";
  * checks file-size [--init|--clean]
  * checks pages [--init]
  * checks i18n [--init|--clean]
+ * checks cycles [--init|--clean]
  * checks pr [--base origin/main]  hints on the branch, never fails
  *
  * --init writes what fails today into the allowlist (only when a project takes up the check),
  * --clean drops what is fixed since.
  */
 
-const USAGE = "usage: checks [all|file-size|pages|i18n|pr] [--init] [--clean] [--base <ref>]";
+const USAGE = "usage: checks [all|file-size|pages|i18n|cycles|pr] [--init] [--clean] [--base <ref>]";
 
 const { values, positionals } = parseArgs({
   allowPositionals: true,
@@ -51,6 +53,7 @@ switch (command) {
     if (config.fileSize) failed = runFileSize(config.fileSize, "check") || failed;
     if (config.pages) failed = runPages(config.pages, "check") || failed;
     if (config.i18n) failed = runI18n(config.i18n, "check") || failed;
+    if (config.cycles) failed = runCycles(config.cycles, "check") || failed;
     break;
   case "file-size":
     if (!config.fileSize) missing("fileSize");
@@ -63,6 +66,10 @@ switch (command) {
   case "i18n":
     if (!config.i18n) missing("i18n");
     else failed = runI18n(config.i18n, mode);
+    break;
+  case "cycles":
+    if (!config.cycles) missing("cycles");
+    else failed = runCycles(config.cycles, mode);
     break;
   case "pr":
     runPr(config, values.base);

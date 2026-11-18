@@ -18,6 +18,13 @@ export type I18nConfig = {
   allowlist: string;
   dynamicPrefixes: string[];
 };
+export type CyclesConfig = {
+  modules: string[];
+  include: string[];
+  exclude: string[];
+  aliases: Record<string, string>;
+  allowlist: string;
+};
 export type PrConfig = { code: string[]; docs: string[]; tests: string[]; grownLines: number };
 
 export type Config = {
@@ -25,6 +32,7 @@ export type Config = {
   functions?: FunctionsConfig;
   pages?: PagesConfig;
   i18n?: I18nConfig;
+  cycles?: CyclesConfig;
   pr: PrConfig;
 };
 
@@ -46,6 +54,7 @@ type Raw = {
   functions?: Partial<FunctionsConfig>;
   pages?: Partial<PagesConfig>;
   i18n?: Partial<I18nConfig>;
+  cycles?: Partial<CyclesConfig>;
   pr?: Partial<PrConfig>;
 };
 
@@ -92,7 +101,17 @@ export function resolveConfig(raw: Raw): Config {
     grownLines: 20,
     ...raw.pr,
   };
-  return { fileSize, functions, pages, i18n, pr };
+  const cycles = raw.cycles?.modules
+    ? {
+        include: (fileSize?.include ?? ["**/*.{ts,tsx}"]).filter((glob) => !glob.endsWith(".rs")),
+        exclude: DEFAULT_EXCLUDE,
+        aliases: {},
+        allowlist: ".checks/cycles.txt",
+        ...raw.cycles,
+        modules: raw.cycles.modules,
+      }
+    : undefined;
+  return { fileSize, functions, pages, i18n, cycles, pr };
 }
 
 export function loadConfig(root = "."): Config {
