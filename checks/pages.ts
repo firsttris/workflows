@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { type PagesConfig, readList, writeList } from "./config.ts";
+import { MESSAGES, type Messages } from "./messages.ts";
 
 /*
  * Every page of the app is opened by the given spec files (say the one that runs axe on every page), so a new
@@ -95,10 +96,26 @@ const header = `Pages a spec file does not open, one per line: <spec> <page> <re
 firsttris/workflows). The reason "open" marks a gap from before the check; open the page in the
 spec and delete the line. A new page goes into the spec, not here.`;
 
+/** Lines naming a spec that checks.json does not list: such an exception would never be read */
+export const unknownSpecs = (exceptions: Exception[], specs: string[]) => [
+  ...new Set(exceptions.filter((e) => !specs.includes(e.spec)).map((e) => e.spec)),
+];
+
 /** Prints the reports; true if there is an error. `init` writes today's gaps as open */
-export function runPages(config: PagesConfig, mode: "check" | "init"): boolean {
-  const exceptions = parseExceptions(readList(config.exceptions, config.requireList));
+export function runPages(
+  config: PagesConfig,
+  mode: "check" | "init",
+  messages: Messages = MESSAGES.en,
+): boolean {
+  const text = messages.pages;
   const pages = pagesOf(readFileSync(config.routeTree, "utf8"), config.ignore);
+  const exceptions = parseExceptions(readList(config.exceptions, config.requireList));
+  const unknown = unknownSpecs(exceptions, config.specs);
+  if (unknown.length > 0) {
+    for (const spec of unknown) console.error(text.unknownSpec(config.exceptions, spec));
+    console.error(text.summary(unknown.length));
+    return true;
+  }
   const reports = config.specs.flatMap((spec) => {
     const paths = pathsIn(readFileSync(spec, "utf8"));
     const own = forSpec(exceptions, spec);
@@ -106,29 +123,28 @@ export function runPages(config: PagesConfig, mode: "check" | "init"): boolean {
       ...missingPages(pages, paths, own).map((page) => ({
         spec,
         page,
-        message: `${spec}: page ${page} is missing`,
+        stale: false,
+        message: text.missing(spec, page),
       })),
       ...staleExceptions(pages, paths, own).map((page) => ({
         spec,
         page,
-        message: `${config.exceptions}: the exception ${page} for ${spec} is stale and can go`,
+        stale: true,
+        message: text.stale(config.exceptions, page, spec),
       })),
     ];
   });
   if (mode === "init") {
-    const stale = new Set(
-      reports.filter((r) => r.message.includes("stale")).map((r) => `${r.spec} ${r.page}`),
-    );
+    const stale = new Set(reports.filter((r) => r.stale).map((r) => `${r.spec} ${r.page}`));
     const kept = exceptions.filter((e) => !stale.has(`${e.spec} ${e.page}`));
-    const added = reports
-      .filter((r) => !r.message.includes("stale"))
-      .map((r) => ({ spec: r.spec, page: r.page, reason: OPEN }));
+    const added = reports.filter((r) => !r.stale).map((r) => ({ spec: r.spec, page: r.page, reason: OPEN }));
     const all = [...kept, ...added].map((e) => `${e.spec} ${e.page} ${e.reason}`);
     writeList(config.exceptions, header, all);
-    console.log(`${config.exceptions}: ${all.length} exception(s)`);
+    const written = text.written(config.exceptions, all.length);
+    if (written !== undefined) console.log(written);
     return false;
   }
   for (const { message } of reports) console.error(message);
-  if (reports.length > 0) console.error(`\npages: ${reports.length} report(s)`);
+  if (reports.length > 0) console.error(text.summary(reports.length));
   return reports.length > 0;
 }

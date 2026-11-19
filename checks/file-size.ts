@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { diskFiles, type FileSizeConfig, projectFiles, readList, selects, writeList } from "./config.ts";
+import { MESSAGES, type Messages } from "./messages.ts";
 
 /*
  * A file does one thing: past `max` lines (400) it is split. Older files are larger; they are in the
@@ -17,23 +18,29 @@ export function countLines(code: string): number {
 }
 
 /** Errors: files past the limit that are not on the allowlist */
-export function unlistedLargeFiles(lines: Record<string, number>, allowed: string[], max: number): Report[] {
+export function unlistedLargeFiles(
+  lines: Record<string, number>,
+  allowed: string[],
+  max: number,
+  allowlist = "",
+  text = MESSAGES.en.fileSize,
+): Report[] {
   return Object.entries(lines)
     .filter(([file, count]) => count > max && !allowed.includes(file))
-    .map(([file, count]) => ({
-      file,
-      message: `${count} lines, more than ${max}: put the new part into a file of its own. If it is a renamed file of the allowlist, rename it there too.`,
-    }));
+    .map(([file, count]) => ({ file, message: text.tooLarge(count, max, allowlist) }));
 }
 
 /** Allowlisted files that are gone or back within the limit */
-export function removableFiles(lines: Record<string, number>, allowed: string[], max: number): Report[] {
+export function removableFiles(
+  lines: Record<string, number>,
+  allowed: string[],
+  max: number,
+  allowlist = "",
+  text = MESSAGES.en.fileSize,
+): Report[] {
   return allowed
     .filter((file) => (lines[file] ?? 0) <= max)
-    .map((file) => ({
-      file,
-      message: `${file in lines ? `${lines[file]} lines` : "deleted"}: \`checks file-size --clean\` takes it off the allowlist.`,
-    }));
+    .map((file) => ({ file, message: text.removable(lines[file], allowlist) }));
 }
 
 /** The files of a list that are past the limit, sorted */
@@ -55,20 +62,26 @@ They may grow; split them in a pull request of their own. \`checks file-size --c
 ones that are gone or small again.`;
 
 /** Prints the reports; true if there is an error */
-export function runFileSize(config: FileSizeConfig, mode: "check" | "init" | "clean"): boolean {
-  const allowed = readList(config.allowlist, config.requireList);
+export function runFileSize(
+  config: FileSizeConfig,
+  mode: "check" | "init" | "clean",
+  messages: Messages = MESSAGES.en,
+): boolean {
+  const text = messages.fileSize;
   const lines = linesOf(config);
+  const allowed = readList(config.allowlist, config.requireList);
   if (mode !== "check") {
     const candidates = mode === "init" ? [...new Set([...allowed, ...Object.keys(lines)])] : allowed;
     const files = largeFiles(lines, candidates, config.max);
     writeList(config.allowlist, header(config.max), files);
-    console.log(`${config.allowlist}: ${files.length} file(s)`);
+    const written = text.written(config.allowlist, files.length);
+    if (written !== undefined) console.log(written);
     return false;
   }
-  for (const { file, message } of removableFiles(lines, allowed, config.max))
-    console.log(`note: ${file}  ${message}`);
-  const errors = unlistedLargeFiles(lines, allowed, config.max);
+  for (const { file, message } of removableFiles(lines, allowed, config.max, config.allowlist, text))
+    console.log(`${text.note}${file}  ${message}`);
+  const errors = unlistedLargeFiles(lines, allowed, config.max, config.allowlist, text);
   for (const { file, message } of errors) console.error(`${file}  ${message}`);
-  if (errors.length > 0) console.error(`\nfile size: ${errors.length} file(s) over ${config.max} lines`);
+  if (errors.length > 0) console.error(text.summary(errors.length, config.max, config.allowlist));
   return errors.length > 0;
 }

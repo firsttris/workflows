@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { type Language, MESSAGES } from "./messages.ts";
 
 /*
  * The settings of a project, from `checks.json` in its root. Every part is optional; a check whose
@@ -45,6 +46,8 @@ export type CyclesConfig = {
 export type PrConfig = { code: string[]; docs: string[]; tests: string[]; grownLines: number };
 
 export type Config = {
+  /** The language of the messages of file-size and pages (`en`, `de`) */
+  language: Language;
   fileSize?: FileSizeConfig;
   functions?: FunctionsConfig;
   pages?: PagesConfig;
@@ -67,6 +70,7 @@ export const DEFAULT_EXCLUDE = [
 ];
 
 type Raw = {
+  language?: string;
   fileSize?: Partial<FileSizeConfig>;
   functions?: Partial<FunctionsConfig>;
   pages?: Partial<PagesConfig>;
@@ -131,7 +135,9 @@ export function resolveConfig(raw: Raw): Config {
         modules: raw.cycles.modules,
       }
     : undefined;
-  return { fileSize, functions, pages, i18n, cycles, pr };
+  const language = raw.language ?? "en";
+  if (!(language in MESSAGES)) throw new Error(`checks.json: unknown language "${language}"`);
+  return { language: language as Language, fileSize, functions, pages, i18n, cycles, pr };
 }
 
 export function loadConfig(root = "."): Config {

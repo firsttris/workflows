@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, spyOn } from "bun:test";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { diskFiles, readList, resolveConfig } from "./config.ts";
@@ -12,6 +12,9 @@ import {
   runFileSize,
   unlistedLargeFiles,
 } from "./file-size.ts";
+import { type Language, MESSAGES } from "./messages.ts";
+
+type Mode = "check" | "init" | "clean";
 
 describe("countLines", () => {
   it("counts as wc -l", () => {
@@ -142,5 +145,97 @@ describe("requireList", () => {
     for (const mode of ["check", "init", "clean"] as const)
       expect(() => runFileSize(config, mode)).toThrow(allowlist);
     expect(existsSync(allowlist)).toBe(false);
+  });
+});
+
+describe("runFileSize with language", () => {
+  /** Runs the check in a folder of files with the given lines, printing into arrays instead of the terminal */
+  function run(files: Record<string, number>, list: string[], language: Language, mode: Mode = "check") {
+    const root = mkdtempSync(join(tmpdir(), "checks-"));
+    for (const [path, count] of Object.entries(files)) {
+      mkdirSync(dirname(join(root, path)), { recursive: true });
+      writeFileSync(join(root, path), "x\n".repeat(count));
+    }
+    mkdirSync(join(root, ".checks"));
+    writeFileSync(join(root, ".checks/large-files.txt"), list.map((file) => `${file}\n`).join(""));
+    const config = resolveConfig({ language, fileSize: { include: ["src/**/*.ts"], files: "disk" } });
+    const out: string[] = [];
+    const err: string[] = [];
+    const log = spyOn(console, "log").mockImplementation((line: string) => out.push(line));
+    const error = spyOn(console, "error").mockImplementation((line: string) => err.push(line));
+    const cwd = process.cwd();
+    process.chdir(root);
+    try {
+      const failed = runFileSize(config.fileSize ?? (undefined as never), mode, MESSAGES[config.language]);
+      return { failed, out, err, list: readFileSync(join(root, ".checks/large-files.txt"), "utf8") };
+    } finally {
+      process.chdir(cwd);
+      log.mockRestore();
+      error.mockRestore();
+    }
+  }
+  const files = { "src/new.ts": 401, "src/old.ts": 500, "src/small.ts": 12 };
+  const list = ["src/gone.ts", "src/old.ts", "src/small.ts"];
+
+  it("prints the English messages by default", () => {
+    expect(run(files, list, "en")).toMatchObject({
+      failed: true,
+      out: [
+        "note: src/gone.ts  deleted: `checks file-size --clean` takes it off the allowlist.",
+        "note: src/small.ts  12 lines: `checks file-size --clean` takes it off the allowlist.",
+      ],
+      err: [
+        "src/new.ts  401 lines, more than 400: put the new part into a file of its own. If it is a renamed file of the allowlist, rename it there too.",
+        "\nfile size: 1 file(s) over 400 lines",
+      ],
+    });
+  });
+
+  it("prints the German messages of Haben's old check with language de, the list and command of today", () => {
+    expect(run(files, list, "de")).toMatchObject({
+      failed: true,
+      out: [
+        "Hinweis: src/gone.ts  gelöscht: kann mit `bun checks file-size --clean` aus .checks/large-files.txt.",
+        "Hinweis: src/small.ts  12 Zeilen: kann mit `bun checks file-size --clean` aus .checks/large-files.txt.",
+      ],
+      err: [
+        "src/new.ts  401 Zeilen, mehr als 400 und nicht in .checks/large-files.txt: Neues in eine eigene Datei legen. Ist es eine umbenannte alte Datei, den Pfad in .checks/large-files.txt mit ändern.",
+        "\nDateigröße: 1 Datei über 400 Zeilen, nicht in .checks/large-files.txt",
+      ],
+    });
+    expect(run({ ...files, "src/b.ts": 401 }, list, "de").err.at(-1)).toBe(
+      "\nDateigröße: 2 Dateien über 400 Zeilen, nicht in .checks/large-files.txt",
+    );
+  });
+
+  it("writes the list silently with --clean and --init in German, as the old check did", () => {
+    for (const mode of ["clean", "init"] as const) {
+      const result = run(files, list, "de", mode);
+      expect(result).toMatchObject({ failed: false, out: [], err: [] });
+      expect(result.list).toEndWith(mode === "clean" ? "\nsrc/old.ts\n" : "\nsrc/new.ts\nsrc/old.ts\n");
+    }
+    expect(run(files, list, "en", "clean").out).toEqual([".checks/large-files.txt: 1 file(s)"]);
+  });
+
+  it("reads the files before the list, as before requireList: a missing folder fails first", () => {
+    const config =
+      resolveConfig({
+        fileSize: { include: ["src/**/*.ts"], allowlist: "/missing/list.txt", requireList: true },
+      }).fileSize ?? (undefined as never);
+    const cwd = process.cwd();
+    process.chdir(mkdtempSync(join(tmpdir(), "checks-")));
+    try {
+      expect(() => runFileSize(config, "check")).toThrow(/git/);
+    } finally {
+      process.chdir(cwd);
+    }
+  });
+});
+
+describe("resolveConfig with language", () => {
+  it("takes en by default and refuses a language without messages", () => {
+    expect(resolveConfig({}).language).toBe("en");
+    expect(resolveConfig({ language: "de" }).language).toBe("de");
+    expect(() => resolveConfig({ language: "fr" })).toThrow('checks.json: unknown language "fr"');
   });
 });
