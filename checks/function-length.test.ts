@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { functionLengthHints, functionLengths } from "./function-length.ts";
+import { functionLengthHints, functionLengths, grownFunctions } from "./function-length.ts";
 
 /** Function with `lines` lines as Biome counts: as many statements in the body, blank lines between that do not count */
 const fn = (name: string, lines: number) =>
@@ -121,6 +121,51 @@ describe("functionLengthHints", () => {
     const before = fn("old", 150) + fn("shrinks", 150);
     expect(
       messages([{ file: FILE, before, after: fn("old", 150) + fn("shrinks", 120) + fn("limit", 80) }]),
+    ).toEqual([]);
+  });
+});
+
+describe("grownFunctions", () => {
+  const callback = (lines: number) =>
+    `on(() => {\n${Array.from({ length: lines }, (_, i) => `  a${i}();\n`).join("")}});\n`;
+
+  it("gives the lengths before and after, for a project that words the hints itself", () => {
+    expect(
+      grownFunctions(
+        [{ file: FILE, before: fn("a", 80) + fn("b", 120), after: fn("a", 81) + fn("b", 195) + fn("c", 90) }],
+        80,
+      ),
+    ).toEqual([
+      { file: FILE, name: "a", lines: 81, was: 80 },
+      { file: FILE, name: "b", lines: 195, was: 120 },
+      { file: FILE, name: "c", lines: 90, was: undefined },
+    ]);
+  });
+
+  it("names functions without a name as asked, matched as before", () => {
+    expect([...functionLengths("x.ts", "const x = [() => {}, () => {}];", "(anonym)").keys()]).toEqual([
+      "x › (anonym)",
+      "x › (anonym) #2",
+    ]);
+    expect(
+      grownFunctions(
+        [{ file: FILE, before: callback(100), after: callback(50) + callback(90) }],
+        80,
+        "(anonym)",
+      ),
+    ).toEqual([{ file: FILE, name: "(anonym) #2", lines: 90, was: undefined }]);
+    expect(
+      grownFunctions(
+        [
+          {
+            file: FILE,
+            before: callback(100) + callback(5),
+            after: callback(3) + callback(100) + callback(5),
+          },
+        ],
+        80,
+        "(anonym)",
+      ),
     ).toEqual([]);
   });
 });
