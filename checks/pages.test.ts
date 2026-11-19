@@ -1,5 +1,9 @@
 import { describe, expect, it } from "bun:test";
-import { missingPages, OPEN, pagesOf, parseExceptions, pathsIn, staleExceptions } from "./pages.ts";
+import { existsSync, mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { resolveConfig } from "./config.ts";
+import { missingPages, OPEN, pagesOf, parseExceptions, pathsIn, runPages, staleExceptions } from "./pages.ts";
 
 /** A path with an expression, as text in the source of a spec */
 // biome-ignore lint/suspicious/noTemplateCurlyInString: the expression is text of the spec here, no placeholder
@@ -96,5 +100,16 @@ describe("parseExceptions", () => {
       { spec: "e2e/a11y.spec.ts", page: "/reports", reason: "redirects to /reports/$year" },
       { spec: "e2e/a11y.spec.ts", page: "/x", reason: OPEN },
     ]);
+  });
+});
+
+describe("runPages with requireList", () => {
+  it("aborts when the exceptions file is missing, before it reads the route tree, and writes none", () => {
+    const exceptions = join(mkdtempSync(join(tmpdir(), "checks-")), ".checks/pages.txt");
+    const config =
+      resolveConfig({ pages: { routeTree: "missing/routeTree.gen.ts", exceptions, requireList: true } })
+        .pages ?? (undefined as never);
+    for (const mode of ["check", "init"] as const) expect(() => runPages(config, mode)).toThrow(exceptions);
+    expect(existsSync(exceptions)).toBe(false);
   });
 });

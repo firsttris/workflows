@@ -1,10 +1,17 @@
 import { describe, expect, it } from "bun:test";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { resolveConfig } from "./config.ts";
-import { countLines, largeFiles, linesOf, removableFiles, unlistedLargeFiles } from "./file-size.ts";
+import { diskFiles, readList, resolveConfig } from "./config.ts";
+import {
+  countLines,
+  largeFiles,
+  linesOf,
+  removableFiles,
+  runFileSize,
+  unlistedLargeFiles,
+} from "./file-size.ts";
 
 describe("countLines", () => {
   it("counts as wc -l", () => {
@@ -62,6 +69,7 @@ describe("linesOf", () => {
     write("apps/web/src/a.test.ts", "x\n");
     write("apps/web/src/node_modules/m.ts", "x\n");
     write("apps/web/other/b.ts", "x\n");
+    write("apps/web/data/receipt.pdf", "x\n");
     write("scripts/.hidden/c.ts", "x\n");
     write(".gitignore", "gen/\nnode_modules/\n");
     symlinkSync(join(root, "apps/web/other"), join(root, "apps/web/src/linked"));
@@ -94,5 +102,45 @@ describe("linesOf", () => {
       "apps/web/src/new.tsx": 1,
       "scripts/.hidden/c.ts": 1,
     });
+  });
+});
+
+describe("diskFiles", () => {
+  it("enters only the folders the globs can reach, as a lint that never reads data folders beside src", () => {
+    const root = mkdtempSync(join(tmpdir(), "checks-"));
+    for (const path of [
+      "apps/web/src/a.ts",
+      "apps/web/data/receipt.pdf",
+      "apps/web/other/b.ts",
+      "scripts/c.ts",
+      "docs/d.ts",
+    ]) {
+      mkdirSync(dirname(join(root, path)), { recursive: true });
+      writeFileSync(join(root, path), "x\n");
+    }
+    expect(diskFiles(["apps/*/src/**/*.ts", "scripts/**/*.ts"], root).sort()).toEqual([
+      "apps/web/src/a.ts",
+      "scripts/c.ts",
+    ]);
+  });
+});
+
+describe("requireList", () => {
+  const root = () => mkdtempSync(join(tmpdir(), "checks-"));
+
+  it("readList: an absent list is empty, unless it is required", () => {
+    const path = join(root(), "missing.txt");
+    expect(readList(path)).toEqual([]);
+    expect(() => readList(path, true)).toThrow(path);
+  });
+
+  it("file-size aborts in every mode when the required allowlist is missing, and writes none", () => {
+    const allowlist = join(root(), ".checks/large-files.txt");
+    const config =
+      resolveConfig({ fileSize: { include: ["src/**/*.ts"], files: "disk", allowlist, requireList: true } })
+        .fileSize ?? (undefined as never);
+    for (const mode of ["check", "init", "clean"] as const)
+      expect(() => runFileSize(config, mode)).toThrow(allowlist);
+    expect(existsSync(allowlist)).toBe(false);
   });
 });
