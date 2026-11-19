@@ -128,6 +128,31 @@ describe("diskFiles", () => {
   });
 });
 
+describe("diskFiles as Haben's scripts/dateigroesse walked its folders", () => {
+  const tree = (paths: string[]) => {
+    const root = mkdtempSync(join(tmpdir(), "checks-"));
+    for (const path of paths) {
+      mkdirSync(dirname(join(root, path)), { recursive: true });
+      writeFileSync(join(root, path), "x\n");
+    }
+    return root;
+  };
+
+  it("enters a folder named .git below a start folder", () => {
+    expect(diskFiles(["src/**/*.ts"], tree(["src/a/.git/b.ts"]))).toEqual(["src/a/.git/b.ts"]);
+  });
+
+  it("fails when the folder a pattern looks into is missing (readdir of apps or packages)", () => {
+    const root = tree(["apps/web/src/a.ts"]);
+    expect(() => diskFiles(["apps/*/src/**/*.ts", "packages/*/src/**/*.ts"], root)).toThrow("ENOENT");
+  });
+
+  it("fails when a start folder is a file (readdir of apps/*/src or scripts)", () => {
+    expect(() => diskFiles(["apps/*/src/**/*.ts"], tree(["apps/web/src"]))).toThrow("ENOTDIR");
+    expect(() => diskFiles(["scripts/**/*.ts"], tree(["scripts"]))).toThrow("ENOTDIR");
+  });
+});
+
 describe("requireList", () => {
   const root = () => mkdtempSync(join(tmpdir(), "checks-"));
 
@@ -229,6 +254,14 @@ describe("runFileSize with language", () => {
     } finally {
       process.chdir(cwd);
     }
+  });
+
+  it("de: a list entry naming a property of Object.prototype is a note, as Haben's old check printed it; en: quiet, as v1", () => {
+    const files = { "src/a.ts": 1 };
+    expect(run(files, ["toString"], "de").out).toEqual([
+      "Hinweis: toString  function toString() { [native code] } Zeilen: kann mit `bun checks file-size --clean` aus .checks/large-files.txt.",
+    ]);
+    expect(run(files, ["toString"], "en").out).toEqual([]);
   });
 });
 
