@@ -707,10 +707,13 @@ bun add -d github:firsttris/workflows#v1
 
 - `fileSize`: `max` (400), `exclude` (tests, e2e, generated code, `paraglide/`), `allowlist`,
   `files`: `git` (the files git knows, the default) or `disk` (every file in the folders of the
-  globs, also ignored ones, without `node_modules`; for a lint that runs where git is missing).
+  globs, also ignored ones, without `node_modules`; for a lint that runs where git is missing),
+  `requireList` (`false`: a missing allowlist is empty; `true`: the check aborts, also with `--init`
+  and `--clean`).
   The functions are counted in the JavaScript and TypeScript files of the same globs (`functions`
   with `max`, `include` and `exclude` for other ones).
-- `pages`: `ignore` (regular expressions, default `^/api/`), `exceptions`. A page left out on purpose
+- `pages`: `ignore` (regular expressions, default `^/api/`), `exceptions`, `requireList` (as for
+  `fileSize`). A page left out on purpose
   goes into `.checks/pages.txt` as `<spec> <page> <reason>`.
 - `i18n`: `exclude`, `allowlist`, `dynamicPrefixes` for keys built at run time (`server_${code}`).
 - `cycles`: `modules` (required), `aliases` such as `{ "@/": "src/" }` for the paths of tsconfig, `include`

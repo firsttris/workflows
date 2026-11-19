@@ -85,7 +85,7 @@ export function runPr(config: Config, base: string): void {
 
   const hints: string[] = [...changeHints(files, subjects, config.pr)];
   if (config.fileSize) {
-    const allowed = readList(config.fileSize.allowlist);
+    const allowed = readList(config.fileSize.allowlist, config.fileSize.requireList);
     const grown = files
       .filter((file) => allowed.includes(file))
       .flatMap((file) => {

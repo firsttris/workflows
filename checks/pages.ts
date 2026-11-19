@@ -97,8 +97,8 @@ spec and delete the line. A new page goes into the spec, not here.`;
 
 /** Prints the reports; true if there is an error. `init` writes today's gaps as open */
 export function runPages(config: PagesConfig, mode: "check" | "init"): boolean {
+  const exceptions = parseExceptions(readList(config.exceptions, config.requireList));
   const pages = pagesOf(readFileSync(config.routeTree, "utf8"), config.ignore);
-  const exceptions = parseExceptions(readList(config.exceptions));
   const reports = config.specs.flatMap((spec) => {
     const paths = pathsIn(readFileSync(spec, "utf8"));
     const own = forSpec(exceptions, spec);

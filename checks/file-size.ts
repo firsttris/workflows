@@ -56,8 +56,8 @@ ones that are gone or small again.`;
 
 /** Prints the reports; true if there is an error */
 export function runFileSize(config: FileSizeConfig, mode: "check" | "init" | "clean"): boolean {
+  const allowed = readList(config.allowlist, config.requireList);
   const lines = linesOf(config);
-  const allowed = readList(config.allowlist);
   if (mode !== "check") {
     const candidates = mode === "init" ? [...new Set([...allowed, ...Object.keys(lines)])] : allowed;
     const files = largeFiles(lines, candidates, config.max);
