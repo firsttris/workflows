@@ -1,5 +1,10 @@
 import { describe, expect, it } from "bun:test";
-import { countLines, largeFiles, removableFiles, unlistedLargeFiles } from "./file-size.ts";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { resolveConfig } from "./config.ts";
+import { countLines, largeFiles, linesOf, removableFiles, unlistedLargeFiles } from "./file-size.ts";
 
 describe("countLines", () => {
   it("counts as wc -l", () => {
@@ -40,5 +45,54 @@ describe("largeFiles", () => {
     expect(
       largeFiles({ "b.ts": 700, "a.ts": 950, "small.ts": 380 }, ["b.ts", "small.ts", "gone.ts", "a.ts"], 400),
     ).toEqual(["a.ts", "b.ts"]);
+  });
+});
+
+describe("linesOf", () => {
+  /** A repository with a tracked, an ignored and an untracked file, node_modules and a link to a folder */
+  function project(): string {
+    const root = mkdtempSync(join(tmpdir(), "checks-"));
+    const write = (path: string, text: string) => {
+      mkdirSync(dirname(join(root, path)), { recursive: true });
+      writeFileSync(join(root, path), text);
+    };
+    write("apps/web/src/a.ts", "a\nb\n");
+    write("apps/web/src/gen/ignored.ts", "x\n");
+    write("apps/web/src/new.tsx", "x\n");
+    write("apps/web/src/a.test.ts", "x\n");
+    write("apps/web/src/node_modules/m.ts", "x\n");
+    write("apps/web/other/b.ts", "x\n");
+    write("scripts/.hidden/c.ts", "x\n");
+    write(".gitignore", "gen/\nnode_modules/\n");
+    symlinkSync(join(root, "apps/web/other"), join(root, "apps/web/src/linked"));
+    execFileSync("git", ["init", "-q"], { cwd: root });
+    execFileSync("git", ["add", "apps/web/src/a.ts", "scripts", ".gitignore"], { cwd: root });
+    return root;
+  }
+  const config = (files?: "disk") =>
+    resolveConfig({
+      fileSize: {
+        include: ["apps/*/src/**/*.{ts,tsx}", "scripts/**/*.ts"],
+        exclude: ["**/*.test.ts"],
+        ...(files && { files }),
+      },
+    }).fileSize ?? (undefined as never);
+
+  it("reads the files git knows, new ones too, by default", () => {
+    expect(Object.keys(linesOf(config(), project())).sort()).toEqual([
+      "apps/web/src/a.ts",
+      "apps/web/src/new.tsx",
+      "scripts/.hidden/c.ts",
+    ]);
+  });
+
+  it("with files: disk reads every file in the folders of the globs, ignored ones too, without git", () => {
+    const root = project();
+    expect(linesOf(config("disk"), root)).toEqual({
+      "apps/web/src/a.ts": 2,
+      "apps/web/src/gen/ignored.ts": 1,
+      "apps/web/src/new.tsx": 1,
+      "scripts/.hidden/c.ts": 1,
+    });
   });
 });

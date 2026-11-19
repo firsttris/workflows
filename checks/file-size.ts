@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { type FileSizeConfig, projectFiles, readList, selects, writeList } from "./config.ts";
+import { diskFiles, type FileSizeConfig, projectFiles, readList, selects, writeList } from "./config.ts";
 
 /*
  * A file does one thing: past `max` lines (400) it is split. Older files are larger; they are in the
@@ -43,7 +43,7 @@ export function largeFiles(lines: Record<string, number>, candidates: string[], 
 
 export function linesOf(config: FileSizeConfig, root = "."): Record<string, number> {
   return Object.fromEntries(
-    projectFiles(root)
+    (config.files === "disk" ? diskFiles(config.include, root) : projectFiles(root))
       .filter((file) => selects(file, config.include, config.exclude))
       .map((file) => [file, countLines(readFileSync(`${root}/${file}`, "utf8"))]),
   );

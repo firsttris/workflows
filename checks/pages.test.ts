@@ -32,6 +32,22 @@ describe("pagesOf", () => {
   });
 });
 
+describe("pagesOf with several ignored paths", () => {
+  it("leaves out each of them and keeps the index route without its slash", () => {
+    const tree = `
+export interface FileRoutesByFullPath {
+  '/': typeof IndexRoute
+  '/login': typeof LoginRoute
+  '/login/hilfe': typeof LoginHelpRoute
+  '/.well-known/oauth-authorization-server': typeof WellKnownRoute
+  '/einladung/$token': typeof InviteRoute
+  '/rechnungen/': typeof InvoicesIndexRoute
+}`;
+    const ignore = ["^/api/", "^/\\.well-known/", "^/login$", "^/setup$", "^/einladung/"];
+    expect(pagesOf(tree, ignore)).toEqual(["/", "/login/hilfe", "/rechnungen"]);
+  });
+});
+
 describe("pathsIn", () => {
   it("finds strings, template strings and path patterns, without the query", () => {
     const spec = `goto("/invoices?year=2026"); goto(\`${ID_PATH}\`); firstLink(page, /^\\/reports\\/[0-9]+$/);`;
@@ -49,6 +65,10 @@ describe("missingPages", () => {
     expect(missingPages(pages, [ID_PATH], {})).not.toContain("/invoices/$id");
   });
 
+  it("does not take a parameter for several segments", () => {
+    expect(missingPages(["/invoices/$id"], ["/invoices/a/b"], {})).toEqual(["/invoices/$id"]);
+  });
+
   it("leaves out the exceptions", () => {
     expect(missingPages(["/a", "/b"], ["/a"], { "/b": "redirects to /a" })).toEqual([]);
   });
@@ -58,6 +78,13 @@ describe("staleExceptions", () => {
   it("names exceptions of pages that are gone and open ones the spec now reaches", () => {
     const exceptions = { "/gone": OPEN, "/a": OPEN, "/b": "a 404 test only" };
     expect(staleExceptions(["/a", "/b"], ["/a", "/b"], exceptions)).toEqual(["/gone", "/a"]);
+  });
+});
+
+describe("staleExceptions with a reason of its own", () => {
+  it("keeps it although a pattern of the spec reaches the page (a 404 test)", () => {
+    const exceptions = { "/reminders/$id": "a 404 test only" };
+    expect(staleExceptions(["/reminders/$id"], ["/reminders/[^/]+"], exceptions)).toEqual([]);
   });
 });
 

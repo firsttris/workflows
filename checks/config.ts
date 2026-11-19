@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 
 /*
  * The settings of a project, from `checks.json` in its root. Every part is optional; a check whose
@@ -8,7 +8,15 @@ import { dirname } from "node:path";
  * the root and matched as globs (Bun.Glob, with braces: `src/**\/*.{ts,tsx}`).
  */
 
-export type FileSizeConfig = { max: number; include: string[]; exclude: string[]; allowlist: string };
+/** `git`: the files git knows; `disk`: every file on disk, also ignored ones (works without git, say in a container) */
+export type FileSource = "git" | "disk";
+export type FileSizeConfig = {
+  max: number;
+  include: string[];
+  exclude: string[];
+  allowlist: string;
+  files: FileSource;
+};
 export type FunctionsConfig = { max: number; include: string[]; exclude: string[] };
 export type PagesConfig = { routeTree: string; specs: string[]; ignore: string[]; exceptions: string };
 export type I18nConfig = {
@@ -65,6 +73,7 @@ export function resolveConfig(raw: Raw): Config {
     exclude: DEFAULT_EXCLUDE,
     allowlist: ".checks/large-files.txt",
     include: [],
+    files: "git" as const,
     ...raw.fileSize,
   };
   // Only JavaScript and TypeScript files of these globs are read (isScript); Rust has clippy for it
@@ -138,6 +147,33 @@ export function projectFiles(root = "."): string[] {
     maxBuffer: 64 * 1024 * 1024,
   });
   return [...new Set(out.split("\0").filter(Boolean))].filter((file) => existsSync(`${root}/${file}`));
+}
+
+/** The folder a glob starts in: its segments up to the first with a wildcard (`apps/*\/src` gives `apps`) */
+const baseOf = (glob: string) => {
+  const segments = glob.split("/");
+  const wild = segments.findIndex((segment) => /[*?[{]/.test(segment));
+  return segments.slice(0, wild === -1 ? segments.length : wild).join("/");
+};
+
+/** Files below a path, without `node_modules` and `.git`; symbolic links count as files and are not followed */
+function walk(root: string, path: string): string[] {
+  const full = path === "" ? root : join(root, path);
+  if (!existsSync(full)) return [];
+  if (!statSync(full).isDirectory()) return [path];
+  return readdirSync(full, { withFileTypes: true }).flatMap((entry) => {
+    if (entry.name === "node_modules" || entry.name === ".git") return [];
+    const child = path === "" ? entry.name : `${path}/${entry.name}`;
+    return entry.isDirectory() ? walk(root, child) : [child];
+  });
+}
+
+/**
+ * The files on disk in the folders the globs start in, also those git ignores: for a check that runs where git is
+ * missing, say in a container that mounts only the work tree
+ */
+export function diskFiles(include: string[], root = "."): string[] {
+  return [...new Set(include.map(baseOf).flatMap((base) => walk(root, base)))];
 }
 
 /** Lines of a list file without comments (`#`) and blank lines; an absent file is an empty list */

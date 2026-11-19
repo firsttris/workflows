@@ -40,4 +40,11 @@ describe("resolveConfig", () => {
     expect(config.pages).toBeUndefined();
     expect(config.i18n).toBeUndefined();
   });
+
+  it("takes an exclude of fileSize instead of the default one, for functions too", () => {
+    const exclude = ["**/*.{test,spec}.{ts,tsx}", "**/routeTree.gen.ts"];
+    const config = resolveConfig({ fileSize: { include: ["src/**"], exclude } });
+    expect(config.fileSize?.exclude).toEqual(exclude);
+    expect(config.functions?.exclude).toEqual(exclude);
+  });
 });

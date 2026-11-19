@@ -705,7 +705,9 @@ bun add -d github:firsttris/workflows#v1
 }
 ```
 
-- `fileSize`: `max` (400), `exclude` (tests, e2e, generated code, `paraglide/`), `allowlist`.
+- `fileSize`: `max` (400), `exclude` (tests, e2e, generated code, `paraglide/`), `allowlist`,
+  `files`: `git` (the files git knows, the default) or `disk` (every file in the folders of the
+  globs, also ignored ones, without `node_modules`; for a lint that runs where git is missing).
   The functions are counted in the JavaScript and TypeScript files of the same globs (`functions`
   with `max`, `include` and `exclude` for other ones).
 - `pages`: `ignore` (regular expressions, default `^/api/`), `exceptions`. A page left out on purpose

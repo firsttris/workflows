@@ -60,7 +60,7 @@ type Found = { functions: { path: string[]; body: Node }[]; noToken: [number, nu
  * Functions with their name path and body, and the places where a line starts without a new token: in the text
  * of a template string after the backtick and in the text between JSX elements up to and including the next one
  */
-function collect(program: Node): Found {
+function collect(program: Node, anonymous: string): Found {
   const found: Found = { functions: [], noToken: [] };
   // Biome skips getters and setters, but not the functions inside them
   const accessors = new Set<unknown>();
@@ -83,7 +83,7 @@ function collect(program: Node): Found {
     if (value.type === "JSXText") found.noToken.push([value.start, value.end]);
     let inner = path;
     if (FUNCTIONS.has(value.type) && isNode(value.body) && !accessors.has(value)) {
-      inner = named ? path : [...path, keyName(value.id) ?? "(anonymous)"];
+      inner = named ? path : [...path, keyName(value.id) ?? anonymous];
       found.functions.push({ path: inner, body: value.body });
     }
     const child = namedChild(value);
@@ -143,10 +143,11 @@ const lineOf = (lineStarts: number[], offset: number) => {
 /**
  * Lines per function as Biome counts them. The name is the path of the enclosing names, such as `check › (anonymous)`
  * for a callback in `check`; a name that occurs again gets `#2`, `#3`, so that base and head can be matched.
+ * `anonymous` names a function without a name, for a project that writes its hints in another language.
  */
-export function functionLengths(file: string, code: string): Map<string, number> {
+export function functionLengths(file: string, code: string, anonymous = "(anonymous)"): Map<string, number> {
   const { program, comments } = parseSync(file, code);
-  const { functions, noToken } = collect(program as unknown as Node);
+  const { functions, noToken } = collect(program as unknown as Node, anonymous);
   const tokens = firstTokens(code, comments, noToken);
   const lineStarts = [0, ...[...code.matchAll(/\n/g)].map((match) => (match.index ?? 0) + 1)];
   const lengths = new Map<string, number>();
@@ -195,29 +196,35 @@ function previousLengths(
   return result;
 }
 
+export type Change = { file: string; before: string | null; after: string };
+/** A function past the limit with its length before, undefined if it is new */
+export type GrownFunction = { file: string; name: string; lines: number; was: number | undefined };
+
 /**
- * Hints on functions past the limit that are new, were within it before or grew. `before` is null for a new file.
+ * Functions past the limit that are new, were within it before or grew. `before` is null for a new file.
  * When a long function grows, the new part belongs in a function of its own; old long functions the pull request
- * does not lengthen stay quiet, they are split in a pull request of their own.
+ * does not lengthen stay quiet, they are split in a pull request of their own. Exported for a project that words
+ * the hints itself.
  */
-export function functionLengthHints(
-  changes: { file: string; before: string | null; after: string }[],
-  max: number,
-): Hint[] {
+export function grownFunctions(changes: Change[], max: number, anonymous = "(anonymous)"): GrownFunction[] {
   return changes.flatMap(({ file, before, after }) => {
-    const now = functionLengths(file, after);
-    const old = previousLengths(before === null ? new Map() : functionLengths(file, before), now);
+    const now = functionLengths(file, after, anonymous);
+    const old = previousLengths(before === null ? new Map() : functionLengths(file, before, anonymous), now);
     return [...now]
       .filter(([name, lines]) => lines > max && lines > (old.get(name) ?? 0))
-      .map(([name, lines]): Hint => {
-        const was = old.get(name);
-        const change =
-          was === undefined
-            ? `is new with ${lines} lines, more than ${max}: split it before the merge`
-            : was <= max
-              ? `grows from ${was} to ${lines} lines, past ${max}: split it before the merge`
-              : `grows from ${was} to ${lines} lines (limit ${max}): put the new part into a function of its own`;
-        return { file, message: `function "${name}" ${change}` };
-      });
+      .map(([name, lines]) => ({ file, name, lines, was: old.get(name) }));
+  });
+}
+
+/** Hints on the functions of grownFunctions */
+export function functionLengthHints(changes: Change[], max: number): Hint[] {
+  return grownFunctions(changes, max).map(({ file, name, lines, was }): Hint => {
+    const change =
+      was === undefined
+        ? `is new with ${lines} lines, more than ${max}: split it before the merge`
+        : was <= max
+          ? `grows from ${was} to ${lines} lines, past ${max}: split it before the merge`
+          : `grows from ${was} to ${lines} lines (limit ${max}): put the new part into a function of its own`;
+    return { file, message: `function "${name}" ${change}` };
   });
 }
