@@ -1,6 +1,10 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { type Language, MESSAGES } from "./messages.ts";
+
+/** For cli.ts in its import of config.ts: one more import line would shift the lines a crash prints from v1 */
+export { MESSAGES };
 
 /*
  * The settings of a project, from `checks.json` in its root. Every part is optional; a check whose
@@ -45,6 +49,8 @@ export type CyclesConfig = {
 export type PrConfig = { code: string[]; docs: string[]; tests: string[]; grownLines: number };
 
 export type Config = {
+  /** The language of the messages of file-size and pages (`en`, `de`) */
+  language: Language;
   fileSize?: FileSizeConfig;
   functions?: FunctionsConfig;
   pages?: PagesConfig;
@@ -67,6 +73,7 @@ export const DEFAULT_EXCLUDE = [
 ];
 
 type Raw = {
+  language?: string;
   fileSize?: Partial<FileSizeConfig>;
   functions?: Partial<FunctionsConfig>;
   pages?: Partial<PagesConfig>;
@@ -131,7 +138,9 @@ export function resolveConfig(raw: Raw): Config {
         modules: raw.cycles.modules,
       }
     : undefined;
-  return { fileSize, functions, pages, i18n, cycles, pr };
+  const language = raw.language ?? "en";
+  if (!(language in MESSAGES)) throw new Error(`checks.json: unknown language "${language}"`);
+  return { language: language as Language, fileSize, functions, pages, i18n, cycles, pr };
 }
 
 export function loadConfig(root = "."): Config {
@@ -160,13 +169,14 @@ export function projectFiles(root = "."): string[] {
   return [...new Set(out.split("\0").filter(Boolean))].filter((file) => existsSync(`${root}/${file}`));
 }
 
-/** Files below a path, without `node_modules` and `.git`; symbolic links count as files and are not followed */
+/**
+ * Files below a folder, without `node_modules` (and `.git` in the root); symbolic links count as files and are not
+ * followed. A start folder that is a file fails (ENOTDIR), as the walk of Haben's former scripts/dateigroesse did.
+ */
 function walk(root: string, path: string): string[] {
   const full = path === "" ? root : join(root, path);
-  if (!existsSync(full)) return [];
-  if (!statSync(full).isDirectory()) return [path];
   return readdirSync(full, { withFileTypes: true }).flatMap((entry) => {
-    if (entry.name === "node_modules" || entry.name === ".git") return [];
+    if (entry.name === "node_modules" || (path === "" && entry.name === ".git")) return [];
     const child = path === "" ? entry.name : `${path}/${entry.name}`;
     return entry.isDirectory() ? walk(root, child) : [child];
   });
@@ -176,8 +186,9 @@ const isPattern = (segment: string) => /[*?[{]/.test(segment);
 
 /**
  * The folders a glob starts in: its segments up to `**` (or up to the file name) name folders, so `apps/*\/src/**`
- * gives `apps/web/src` and `apps/api/src` and never enters `apps/web/data`. A fixed segment follows a link, a pattern
- * matches real folders only.
+ * gives `apps/web/src` and `apps/api/src` and never enters `apps/web/data`. A fixed segment follows a link, a
+ * pattern matches real folders only and fails when the folder it looks into is missing, as Haben's former
+ * scripts/dateigroesse (`readdirSync("apps")`); diskFiles keeps the start folders that exist (`existsSync`).
  */
 function startFolders(root: string, glob: string): string[] {
   const segments = glob.split("/");
@@ -188,11 +199,7 @@ function startFolders(root: string, glob: string): string[] {
       paths.flatMap((path) => {
         const child = (name: string) => (path === "" ? name : `${path}/${name}`);
         const full = path === "" ? root : join(root, path);
-        if (!isPattern(segment)) {
-          const next = join(full, segment);
-          return existsSync(next) && statSync(next).isDirectory() ? [child(segment)] : [];
-        }
-        if (!existsSync(full)) return [];
+        if (!isPattern(segment)) return [child(segment)];
         const pattern = new Bun.Glob(segment);
         return readdirSync(full, { withFileTypes: true })
           .filter((entry) => entry.isDirectory() && pattern.match(entry.name))
@@ -207,9 +214,10 @@ function startFolders(root: string, glob: string): string[] {
  * missing, say in a container that mounts only the work tree
  */
 export function diskFiles(include: string[], root = "."): string[] {
-  return [
-    ...new Set(include.flatMap((glob) => startFolders(root, glob)).flatMap((folder) => walk(root, folder))),
-  ];
+  const folders = include
+    .flatMap((glob) => startFolders(root, glob))
+    .filter((folder) => existsSync(folder === "" ? root : join(root, folder)));
+  return [...new Set(folders.flatMap((folder) => walk(root, folder)))];
 }
 
 /**

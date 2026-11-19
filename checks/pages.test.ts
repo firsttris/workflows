@@ -1,8 +1,9 @@
-import { describe, expect, it } from "bun:test";
-import { existsSync, mkdtempSync } from "node:fs";
+import { describe, expect, it, spyOn } from "bun:test";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { resolveConfig } from "./config.ts";
+import { type Language, MESSAGES } from "./messages.ts";
 import { missingPages, OPEN, pagesOf, parseExceptions, pathsIn, runPages, staleExceptions } from "./pages.ts";
 
 /** A path with an expression, as text in the source of a spec */
@@ -103,13 +104,155 @@ describe("parseExceptions", () => {
   });
 });
 
-describe("runPages with requireList", () => {
-  it("aborts when the exceptions file is missing, before it reads the route tree, and writes none", () => {
+/** Runs the check in a folder with a route tree, specs and exceptions, printing into arrays */
+function runIn(
+  specs: Record<string, string>,
+  exceptions: string[],
+  language: Language,
+  mode: "check" | "init" = "check",
+  tree = routeTree,
+) {
+  const root = mkdtempSync(join(tmpdir(), "checks-"));
+  const write = (path: string, text: string) => {
+    mkdirSync(dirname(join(root, path)), { recursive: true });
+    writeFileSync(join(root, path), text);
+  };
+  write("src/routeTree.gen.ts", tree);
+  for (const [spec, text] of Object.entries(specs)) write(spec, text);
+  write(".checks/pages.txt", exceptions.map((line) => `${line}\n`).join(""));
+  const config = resolveConfig({
+    language,
+    pages: { routeTree: "src/routeTree.gen.ts", specs: Object.keys(specs), requireList: true },
+  });
+  const out: string[] = [];
+  const err: string[] = [];
+  const log = spyOn(console, "log").mockImplementation((line: string) => out.push(line));
+  const error = spyOn(console, "error").mockImplementation((line: string) => err.push(line));
+  const cwd = process.cwd();
+  process.chdir(root);
+  try {
+    const failed = runPages(config.pages ?? (undefined as never), mode, MESSAGES[config.language]);
+    return { failed, out, err, list: readFileSync(join(root, ".checks/pages.txt"), "utf8") };
+  } finally {
+    process.chdir(cwd);
+    log.mockRestore();
+    error.mockRestore();
+  }
+}
+
+const ALL = `"/", "/invoices", "/invoices/new", "/invoices/1", "/reports", "/documents/a"`;
+
+describe("runPages with language", () => {
+  const specs = { "e2e/pages.spec.ts": `"/", "/invoices", "/reports"`, "e2e/a11y.spec.ts": ALL };
+  const exceptions = ["e2e/pages.spec.ts /invoices/new open", "e2e/a11y.spec.ts /gone open"];
+
+  it("prints the English messages by default", () => {
+    expect(runIn(specs, exceptions, "en")).toMatchObject({
+      failed: true,
+      out: [],
+      err: [
+        "e2e/pages.spec.ts: page /invoices/$id is missing",
+        "e2e/pages.spec.ts: page /documents/$ is missing",
+        ".checks/pages.txt: the exception /gone for e2e/a11y.spec.ts is stale and can go",
+        "\npages: 3 report(s)",
+      ],
+    });
+  });
+
+  it("prints the German messages of Haben's old check with language de, the exceptions file of today", () => {
+    expect(runIn(specs, exceptions, "de")).toMatchObject({
+      failed: true,
+      out: [],
+      err: [
+        "e2e/pages.spec.ts: Seite /invoices/$id fehlt",
+        "e2e/pages.spec.ts: Seite /documents/$ fehlt",
+        ".checks/pages.txt: Ausnahme /gone für a11y ist veraltet und kann weg",
+        "\nSeitenabdeckung: 3 Meldungen",
+      ],
+    });
+    expect(runIn({ "e2e/a11y.spec.ts": ALL }, ["e2e/a11y.spec.ts /gone open"], "de").err.at(-1)).toBe(
+      "\nSeitenabdeckung: 1 Meldung",
+    );
+  });
+
+  it("writes the exceptions silently with --init in German", () => {
+    const result = runIn(specs, exceptions, "de", "init");
+    expect(result).toMatchObject({ failed: false, out: [], err: [] });
+    expect(result.list).toEndWith(
+      "\ne2e/pages.spec.ts /invoices/new open\ne2e/pages.spec.ts /invoices/$id open\ne2e/pages.spec.ts /documents/$ open\n",
+    );
+  });
+});
+
+describe("runPages with an exception for a spec that checks.json does not name", () => {
+  const specs = { "e2e/a11y.spec.ts": ALL };
+  const exceptions = ["e2e/a11y.spec.ts /reports redirects", "e2e/typo.spec.ts /invoices open"];
+
+  it("fails with language de and names the line, in every mode, and writes nothing", () => {
+    for (const mode of ["check", "init"] as const) {
+      const result = runIn(specs, exceptions, "de", mode);
+      expect(result).toMatchObject({
+        failed: true,
+        out: [],
+        err: [
+          ".checks/pages.txt: e2e/typo.spec.ts ist keine Spec-Datei aus checks.json (pages.specs)",
+          "\nSeitenabdeckung: 1 Meldung",
+        ],
+      });
+      expect(result.list).toBe(`${exceptions.join("\n")}\n`);
+    }
+  });
+
+  it("is never read with language en, as in v1: the check passes and --init keeps the line", () => {
+    expect(runIn(specs, exceptions, "en")).toMatchObject({ failed: false, out: [], err: [] });
+    expect(runIn(specs, exceptions, "en", "init").list).toEndWith(`\n${exceptions.join("\n")}\n`);
+  });
+});
+
+describe("runPages: corner cases kept as each check had them before", () => {
+  const tree = routeTree.replace("'/reports/'", `"/reports/"`).replace("'/invoices/new'", "'/stale/new'");
+  const specs = { "e2e/a11y.spec.ts": `"/", "/invoices", "/invoices/1", "/documents/a"` };
+
+  it("en: --init tells stale reports by the word in the message as v1, so a missing /stale/new stays out", () => {
+    expect(runIn(specs, [], "en", "init", tree).list).toEndWith("here.\ne2e/a11y.spec.ts /reports open\n");
+  });
+
+  it("de: reads only keys in single quotes from the route tree, as Haben's scripts/seitenabdeckung", () => {
+    expect(runIn(specs, [], "de", "check", tree).err).toEqual([
+      "e2e/a11y.spec.ts: Seite /stale/new fehlt",
+      "\nSeitenabdeckung: 1 Meldung",
+    ]);
+    expect(runIn(specs, [], "en", "check", tree).err).toEqual([
+      "e2e/a11y.spec.ts: page /stale/new is missing",
+      "e2e/a11y.spec.ts: page /reports is missing",
+      "\npages: 2 report(s)",
+    ]);
+  });
+
+  it("de: reads the exceptions before the route tree, as Haben's script imported ausnahmen.ts first", () => {
     const exceptions = join(mkdtempSync(join(tmpdir(), "checks-")), ".checks/pages.txt");
     const config =
       resolveConfig({ pages: { routeTree: "missing/routeTree.gen.ts", exceptions, requireList: true } })
         .pages ?? (undefined as never);
-    for (const mode of ["check", "init"] as const) expect(() => runPages(config, mode)).toThrow(exceptions);
+    expect(() => runPages(config, "check", MESSAGES.de)).toThrow(exceptions);
+  });
+});
+
+describe("runPages with requireList", () => {
+  const config = (exceptions: string, routeTree = "missing/routeTree.gen.ts") =>
+    resolveConfig({ pages: { routeTree, exceptions, requireList: true } }).pages ?? (undefined as never);
+
+  it("aborts when the exceptions file is missing, and writes none", () => {
+    const root = mkdtempSync(join(tmpdir(), "checks-"));
+    writeFileSync(join(root, "routeTree.gen.ts"), routeTree);
+    const exceptions = join(root, ".checks/pages.txt");
+    for (const mode of ["check", "init"] as const)
+      expect(() => runPages(config(exceptions, join(root, "routeTree.gen.ts")), mode)).toThrow(exceptions);
     expect(existsSync(exceptions)).toBe(false);
+  });
+
+  it("reads the route tree before the exceptions, as before requireList: a missing route tree fails first", () => {
+    const exceptions = join(mkdtempSync(join(tmpdir(), "checks-")), ".checks/pages.txt");
+    expect(() => runPages(config(exceptions), "check")).toThrow("missing/routeTree.gen.ts");
   });
 });

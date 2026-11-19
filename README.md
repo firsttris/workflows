@@ -715,6 +715,9 @@ bun add -d github:firsttris/workflows#v1
 - `pages`: `ignore` (regular expressions, default `^/api/`), `exceptions`, `requireList` (as for
   `fileSize`). A page left out on purpose
   goes into `.checks/pages.txt` as `<spec> <page> <reason>`.
+- `language`: `en` (the default) or `de`, the messages of `file-size` and `pages`. `de` behaves as
+  Haben's own checks did before the package, also in their corner cases: a line of `pages.txt` for a
+  spec that `specs` does not name fails the check, route keys count only in single quotes.
 - `i18n`: `exclude`, `allowlist`, `dynamicPrefixes` for keys built at run time (`server_${code}`).
 - `cycles`: `modules` (required), `aliases` such as `{ "@/": "src/" }` for the paths of tsconfig, `include`
   (the TypeScript globs of `fileSize`), `exclude`, `allowlist`. Every import counts, type imports too;

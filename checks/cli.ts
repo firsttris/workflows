@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { parseArgs } from "node:util";
-import { loadConfig } from "./config.ts";
+import { loadConfig, MESSAGES } from "./config.ts";
 import { runCycles } from "./cycles.ts";
 import { runFileSize } from "./file-size.ts";
 import { runI18n } from "./i18n.ts";
@@ -39,6 +39,7 @@ if (values.help) {
 const command = positionals[0] ?? "all";
 const mode = values.init ? "init" : values.clean ? "clean" : "check";
 const config = loadConfig();
+const messages = MESSAGES[config.language];
 
 const stop = (message: string): never => {
   console.error(message);
@@ -50,18 +51,18 @@ let failed = false;
 switch (command) {
   case "all":
     if (mode !== "check") stop("--init and --clean need the name of a check");
-    if (config.fileSize) failed = runFileSize(config.fileSize, "check") || failed;
-    if (config.pages) failed = runPages(config.pages, "check") || failed;
+    if (config.fileSize) failed = runFileSize(config.fileSize, "check", messages) || failed;
+    if (config.pages) failed = runPages(config.pages, "check", messages) || failed;
     if (config.i18n) failed = runI18n(config.i18n, "check") || failed;
     if (config.cycles) failed = runCycles(config.cycles, "check") || failed;
     break;
   case "file-size":
     if (!config.fileSize) missing("fileSize");
-    else failed = runFileSize(config.fileSize, mode);
+    else failed = runFileSize(config.fileSize, mode, messages);
     break;
   case "pages":
     if (!config.pages) missing("pages");
-    else failed = runPages(config.pages, mode === "clean" ? "init" : mode);
+    else failed = runPages(config.pages, mode === "clean" ? "init" : mode, messages);
     break;
   case "i18n":
     if (!config.i18n) missing("i18n");
