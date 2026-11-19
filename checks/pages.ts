@@ -14,9 +14,9 @@ import { MESSAGES, type Messages } from "./messages.ts";
 export const OPEN = "open";
 
 /** The pages of `FileRoutesByFullPath` in routeTree.gen.ts, index routes without the trailing slash */
-export function pagesOf(routeTree: string, ignore: string[]): string[] {
+export function pagesOf(routeTree: string, ignore: string[], key = MESSAGES.en.pages.routeKey): string[] {
   const block = routeTree.match(/export interface FileRoutesByFullPath \{([^}]*)\}/)?.[1] ?? "";
-  const paths = [...block.matchAll(/^\s*['"]([^'"]+)['"]:/gm)].map(([, path = ""]) =>
+  const paths = [...block.matchAll(key)].map(([, path = ""]) =>
     path === "/" ? path : path.replace(/\/$/, ""),
   );
   const ignored = ignore.map((source) => new RegExp(source));
@@ -108,10 +108,12 @@ export function runPages(
   messages: Messages = MESSAGES.en,
 ): boolean {
   const text = messages.pages;
-  const pages = pagesOf(readFileSync(config.routeTree, "utf8"), config.ignore);
-  const exceptions = parseExceptions(readList(config.exceptions, config.requireList));
-  const unknown = unknownSpecs(exceptions, config.specs);
-  if (unknown.length > 0) {
+  const readExceptions = () => parseExceptions(readList(config.exceptions, config.requireList));
+  const early = text.exceptionsFirst ? readExceptions() : undefined;
+  const pages = pagesOf(readFileSync(config.routeTree, "utf8"), config.ignore, text.routeKey);
+  const exceptions = early ?? readExceptions();
+  const unknown = text.unknownSpec ? unknownSpecs(exceptions, config.specs) : [];
+  if (text.unknownSpec && unknown.length > 0) {
     for (const spec of unknown) console.error(text.unknownSpec(config.exceptions, spec));
     console.error(text.summary(unknown.length));
     return true;
@@ -135,9 +137,13 @@ export function runPages(
     ];
   });
   if (mode === "init") {
-    const stale = new Set(reports.filter((r) => r.stale).map((r) => `${r.spec} ${r.page}`));
+    const isStale = (r: (typeof reports)[number]) =>
+      text.staleByWord ? r.message.includes("stale") : r.stale;
+    const stale = new Set(reports.filter(isStale).map((r) => `${r.spec} ${r.page}`));
     const kept = exceptions.filter((e) => !stale.has(`${e.spec} ${e.page}`));
-    const added = reports.filter((r) => !r.stale).map((r) => ({ spec: r.spec, page: r.page, reason: OPEN }));
+    const added = reports
+      .filter((r) => !isStale(r))
+      .map((r) => ({ spec: r.spec, page: r.page, reason: OPEN }));
     const all = [...kept, ...added].map((e) => `${e.spec} ${e.page} ${e.reason}`);
     writeList(config.exceptions, header, all);
     const written = text.written(config.exceptions, all.length);

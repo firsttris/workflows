@@ -1,10 +1,9 @@
 #!/usr/bin/env bun
 import { parseArgs } from "node:util";
-import { loadConfig } from "./config.ts";
+import { loadConfig, MESSAGES } from "./config.ts";
 import { runCycles } from "./cycles.ts";
 import { runFileSize } from "./file-size.ts";
 import { runI18n } from "./i18n.ts";
-import { MESSAGES } from "./messages.ts";
 import { runPages } from "./pages.ts";
 import { runPr } from "./pr.ts";
 

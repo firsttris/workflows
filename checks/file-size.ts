@@ -39,7 +39,7 @@ export function removableFiles(
   text = MESSAGES.en.fileSize,
 ): Report[] {
   return allowed
-    .filter((file) => (lines[file] ?? 0) <= max)
+    .filter((file) => text.withinLimit(lines[file], max))
     .map((file) => ({ file, message: text.removable(lines[file], allowlist) }));
 }
 
