@@ -182,7 +182,8 @@ and loads it into the local Docker, with the same registry cache as the release'
 [`actions/apt-install`](actions/apt-install/action.yml) installs Ubuntu packages with the downloaded
 packages and the package lists in the Actions cache, and without the man-db trigger. The mirror the
 runners use is sometimes very slow (100 MB at 130 kB/s, 13 minutes for the FFmpeg headers); with
-the cache only a new runner image or a changed package list downloads again.
+the cache only a changed package list downloads everything again; after a new runner image the
+cache of the image before is restored, and only the packages that changed are downloaded.
 
 ```yaml
       - uses: firsttris/workflows/actions/apt-install@v1
