@@ -2,9 +2,10 @@ name: apt install
 description: >-
   Installs Ubuntu packages with apt-get, the downloaded packages and the package lists kept in the
   Actions cache. The Ubuntu mirror the runners use is sometimes very slow (100 MB at 130 kB/s took
-  13 minutes); with the cache the packages come from the cache instead, and only a new runner image
-  or a changed package list downloads them again. The man-db trigger, which rebuilds the man page
-  index after every install, is switched off.
+  13 minutes); with the cache the packages come from the cache instead. After a new runner image
+  the cache of the image before is restored and only the packages that changed are downloaded;
+  only a changed package list downloads them all again. The man-db trigger, which rebuilds the man
+  page index after every install, is switched off.
 
 inputs:
   packages:
@@ -31,14 +32,17 @@ runs:
         list=$(tr -s ' \n\t' '\n' <<< "$PACKAGES" | sed '/^$/d' | sort -u | tr '\n' ' ')
         hash=$(printf '%s recommends=%s' "$list" "$RECOMMENDS" | sha256sum | cut -c1-16)
         echo "packages=$list" >> "$GITHUB_OUTPUT"
-        # The runner image carries its own package versions: a new image starts a new cache
-        echo "key=apt-$ImageOS-$ImageVersion-$RUNNER_ARCH-$hash" >> "$GITHUB_OUTPUT"
+        # The runner image carries its own package versions: a new image starts a new cache, which
+        # begins from the one of the image before (restore-key), so most packages are already there
+        echo "key=apt-$ImageOS-$RUNNER_ARCH-$hash-$ImageVersion" >> "$GITHUB_OUTPUT"
+        echo "restore-key=apt-$ImageOS-$RUNNER_ARCH-$hash-" >> "$GITHUB_OUTPUT"
 
     - id: cache
       uses: actions/cache/restore@v6
       with:
         path: ${{ runner.temp }}/apt-cache
         key: ${{ steps.key.outputs.key }}
+        restore-keys: ${{ steps.key.outputs.restore-key }}
 
     - shell: bash
       env:
@@ -61,9 +65,14 @@ runs:
             exit 0
           fi
           echo "::warning::Installing from the cache failed, downloading the packages"
+        elif [[ -d "$CACHE/archives" ]]; then
+          # The cache of an earlier runner image: apt downloads only the packages whose version changed
+          sudo cp "$CACHE"/archives/*.deb /var/cache/apt/archives/ 2>/dev/null || true
         fi
         sudo apt-get update -q
         sudo apt-get install "${opts[@]}" "${packages[@]}"
+        # Packages of earlier images that the lists no longer offer are dropped, so the cache stays small
+        sudo apt-get autoclean -q
         rm -rf "$CACHE"
         mkdir -p "$CACHE/lists" "$CACHE/archives"
         sudo cp -a /var/lib/apt/lists/. "$CACHE/lists/"
